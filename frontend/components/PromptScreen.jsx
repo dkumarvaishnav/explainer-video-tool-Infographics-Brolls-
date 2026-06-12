@@ -9,7 +9,74 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [copiedKey, setCopiedKey] = React.useState(null);
+  const [exportOpen, setExportOpen] = React.useState(false);
+  const [exportFormat, setExportFormat] = React.useState("stacked");
+  const [exportFileName, setExportFileName] = React.useState("");
   const pad = density === "compact" ? 16 : 24;
+
+  const handleExport = (fileName, format) => {
+    let text = `=========================================\n`;
+    text += `PROJECT: ${projectName || "Untitled"}\n`;
+    text += `PROMPTS MANIFEST (${format === "stacked" ? "SCENE SEQUENCE" : "SEPARATED BY TYPE"})\n`;
+    text += `=========================================\n\n`;
+
+    if (format === "stacked") {
+      scenes.forEach((scene, i) => {
+        text += `Scene ${String(scene.id).padStart(2, "0")} - ${scene.type}\n`;
+        text += `Brief: ${scene.description || "Untitled"}\n`;
+        text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
+        text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
+        if (i < scenes.length - 1) {
+          text += `-----------------------------------------\n\n`;
+        }
+      });
+    } else {
+      const infographics = scenes.filter(s => s.type === "INFOGRAPHIC");
+      const broll = scenes.filter(s => s.type === "BROLL");
+
+      text += `-----------------------------------------\n`;
+      text += `INFOGRAPHICS (total: ${infographics.length})\n`;
+      text += `-----------------------------------------\n\n`;
+      infographics.forEach((scene, i) => {
+        text += `Scene ${String(scene.id).padStart(2, "0")} - INFOGRAPHIC\n`;
+        text += `Brief: ${scene.description || "Untitled"}\n`;
+        text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
+        text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
+        if (i < infographics.length - 1) {
+          text += `-----------------------------------------\n\n`;
+        }
+      });
+
+      text += `\n`;
+      text += `-----------------------------------------\n`;
+      text += `VIDEO B-ROLL (total: ${broll.length})\n`;
+      text += `-----------------------------------------\n\n`;
+      broll.forEach((scene, i) => {
+        text += `Scene ${String(scene.id).padStart(2, "0")} - BROLL\n`;
+        text += `Brief: ${scene.description || "Untitled"}\n`;
+        text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
+        text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
+        if (i < broll.length - 1) {
+          text += `-----------------------------------------\n\n`;
+        }
+      });
+    }
+
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileName || projectName || "project"}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setExportOpen(false);
+  };
+
+  const openExportModal = () => {
+    setExportFileName(projectName || "project");
+    setExportFormat("stacked");
+    setExportOpen(true);
+  };
 
   React.useEffect(() => localStorage.setItem("promptViewMode", viewMode), [viewMode]);
   React.useEffect(() => localStorage.setItem("promptGlobalStyle", globalStyle), [globalStyle]);
@@ -213,6 +280,9 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
             <Btn variant="secondary" icon="refresh" theme={theme} accent={accent} onClick={() => generatePrompts(true)} disabled={loading}>
               {loading ? "Generating..." : "Regenerate prompts"}
             </Btn>
+            <Btn variant="primary" icon="download" theme={theme} accent={accent} onClick={openExportModal} disabled={loading || scenes.length === 0}>
+              Export Prompts
+            </Btn>
           </div>
         }
       />
@@ -260,6 +330,85 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
       ) : (
         <div style={{ flex: 1, overflow: "auto", padding: `${pad}px`, display: "flex", flexDirection: "column", gap: 10 }}>
           {scenes.map((scene) => <PromptBlock key={scene.id} scene={scene} compact />)}
+        </div>
+      )}
+      {exportOpen && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000,
+        }}>
+          <div style={{
+            width: 440, background: t.bgSurface, border: `1px solid ${t.border}`, borderRadius: 12,
+            padding: 24, boxShadow: "0 8px 30px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 18,
+            fontFamily: FONTS.sansSerif,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: t.text }}>Export Prompts</span>
+              <button
+                onClick={() => setExportOpen(false)}
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: t.textSoft, display: "flex", alignItems: "center" }}
+              >
+                <Icon name="x" size={16} color={t.textSoft} />
+              </button>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textSoft, marginBottom: 6, letterSpacing: "0.04em" }}>FILE NAME</label>
+              <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+                <input
+                  value={exportFileName}
+                  onChange={(e) => setExportFileName(e.target.value)}
+                  placeholder="e.g. project-prompts"
+                  style={{
+                    width: "100%", padding: "9px 12px", borderRadius: 8,
+                    border: `1px solid ${t.border}`, background: t.bg,
+                    color: t.text, fontSize: 13, fontFamily: FONTS.mono,
+                    outline: "none", boxSizing: "border-box",
+                    paddingRight: 45,
+                  }}
+                />
+                <span style={{ position: "absolute", right: 12, fontSize: 12, color: t.textSoft, fontFamily: FONTS.mono }}>.txt</span>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textSoft, marginBottom: 8, letterSpacing: "0.04em" }}>EXPORT FORMAT</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[
+                  { id: "stacked", label: "All prompts stacked", sub: "Scene list order (Scene 01, Scene 02...)" },
+                  { id: "separated", label: "Separated by type", sub: "Infographics separate, Video B-roll separate" }
+                ].map(opt => (
+                  <label
+                    key={opt.id}
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: 10,
+                      padding: "10px 12px", borderRadius: 8, border: `1px solid ${exportFormat === opt.id ? a.main : t.border}`,
+                      background: exportFormat === opt.id ? a.light : t.bg,
+                      cursor: "pointer", boxSizing: "border-box",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      checked={exportFormat === opt.id}
+                      onChange={() => setExportFormat(opt.id)}
+                      style={{ marginTop: 3, accentColor: a.main }}
+                    />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: exportFormat === opt.id ? a.text : t.text }}>{opt.label}</span>
+                      <span style={{ fontSize: 10.5, color: t.textSoft }}>{opt.sub}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 10, justifyContent: "flex-end" }}>
+              <Btn variant="secondary" onClick={() => setExportOpen(false)} theme={theme} accent={accent}>Cancel</Btn>
+              <Btn variant="primary" onClick={() => handleExport(exportFileName, exportFormat)} theme={theme} accent={accent}>Export</Btn>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -14,11 +14,28 @@ const AppShell = () => {
   const [mappingMessages, setMappingMessages] = React.useState([]);
   const [promptScenes, setPromptScenes] = React.useState([]);
   const [mappingLocked, setMappingLocked] = React.useState(false);
+  const [sessions, setSessions] = React.useState([]);
 
   React.useEffect(() => localStorage.setItem("theme", theme), [theme]);
   React.useEffect(() => localStorage.setItem("accent", accent), [accent]);
   React.useEffect(() => localStorage.setItem("density", density), [density]);
   React.useEffect(() => localStorage.setItem("chatStyle", chatStyle), [chatStyle]);
+
+  const fetchSessions = async () => {
+    try {
+      const res = await fetch("/sessions");
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data.sessions || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch sessions", e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchSessions();
+  }, []);
 
   const handleUploadNext = (sid, pName) => {
     setSessionId(sid);
@@ -28,6 +45,59 @@ const AppShell = () => {
     setPromptScenes([]);
     setMappingLocked(false);
     setPhase("mapping");
+    fetchSessions();
+  };
+
+  const handleLoadSession = async (sid) => {
+    try {
+      const res = await fetch(`/sessions/${sid}`);
+      if (!res.ok) throw new Error("Failed to load session");
+      const data = await res.json();
+      const s = data.session;
+
+      setSessionId(s.session_id);
+      setProjectName(s.project_name);
+      setMappingScenes(s.scenes || []);
+      setPromptScenes(s.scenes || []);
+      setMappingLocked(s.approved || false);
+
+      const msgs = (s.chat_history || []).map((m) => ({
+        role: m.role,
+        text: m.text,
+      }));
+      setMappingMessages(msgs);
+
+      if (s.approved || (s.scenes && s.scenes.some((scene) => scene.prompt))) {
+        setPhase("prompts");
+      } else if (s.scenes && s.scenes.length > 0) {
+        setPhase("mapping");
+      } else {
+        setPhase("upload");
+      }
+    } catch (err) {
+      alert("Error loading session: " + err.message);
+    }
+  };
+
+  const handleDeleteSession = async (sid) => {
+    if (!confirm("Are you sure you want to delete this project?")) return;
+    try {
+      const res = await fetch(`/sessions/${sid}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchSessions();
+        if (sessionId === sid) {
+          setSessionId(null);
+          setProjectName(null);
+          setPhase("upload");
+          setMappingScenes([]);
+          setMappingMessages([]);
+          setPromptScenes([]);
+          setMappingLocked(false);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete session", err);
+    }
   };
 
   const handleMappingNext = (scenes) => {
@@ -96,6 +166,10 @@ const AppShell = () => {
         accent={accent}
         onPhaseClick={handlePhaseClick}
         compact={sidebarCompact}
+        sessions={sessions}
+        activeSessionId={sessionId}
+        onSessionSelect={handleLoadSession}
+        onSessionDelete={handleDeleteSession}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>

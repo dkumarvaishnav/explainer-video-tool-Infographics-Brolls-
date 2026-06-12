@@ -190,9 +190,9 @@ PLANNING RULES:
   Preserve available timestamps. For raw scripts, estimate rough timestamps and set estimated=true.
   Prefer 16:9 unless a scene is clearly a square graphic/comparison.
   HARD TIMING LIMIT: no scene may last more than 5 seconds. Use 2-5 second visual beats.
-  If one topic spans longer than 5 seconds, split it into varied consecutive visual beats.
-  It is acceptable to leave small breathing gaps between scenes instead of covering every second.
-  Do not continue the same visual for more than one scene; vary BROLL/INFOGRAPHIC choices when a topic needs multiple beats.
+  If one topic spans longer than 5 seconds, split it smartly into multiple varied visual beats (e.g. if a topic covers 0:12 to 0:30, split it into: a 5s BROLL from 0:13 to 0:18, then a 1-2s empty breathing space, then an INFOGRAPHIC from 0:20 to 0:24, and another BROLL or INFOGRAPHIC from 0:25 to 0:30).
+  It is acceptable and encouraged to leave small breathing gaps between scenes instead of covering every single second.
+  Include variety: do not continue the same visual beat or the same scene type for more than one scene consecutively when a topic pushes the duration; vary BROLL/INFOGRAPHIC choices.
 
 OUTPUT - return a JSON array only. No commentary. No markdown fences.
 Each element must have exactly these fields:
@@ -246,7 +246,7 @@ RULES:
   Keep scene descriptions as editable creative briefs, not final generation prompts.
   Renumber scenes sequentially starting at 1 after inserts, deletes, merges, or moves.
   Preserve fields the user did not ask to change.
-  No scene may last more than 5 seconds. Split longer spans into multiple varied visual beats.
+  No scene may last more than 5 seconds. Split longer spans into multiple varied visual beats with small breathing gaps and scene type variety (BROLL vs INFOGRAPHIC) where appropriate.
 
 RESPONSE - return one JSON object only:
 {

@@ -1,4 +1,4 @@
-﻿"""
+"""
 FastAPI application entry point.
 
 All routes are defined here. Business logic is delegated to service
@@ -381,9 +381,6 @@ async def generate_mapping(body: GenerateMappingRequest):
 
     session.scenes = scenes
     session.total_scenes = len(scenes)
-    logger.info("generate_mapping endpoint: persisting %d scenes for session %s", len(scenes), body.session_id)
-    await store.persist(session)
-    logger.info("generate_mapping endpoint: persist complete, building response")
 
     infographic_count = sum(1 for s in scenes if s.type == "INFOGRAPHIC")
     broll_count = sum(1 for s in scenes if s.type == "BROLL")
@@ -392,7 +389,14 @@ async def generate_mapping(body: GenerateMappingRequest):
         f"infographic{'s' if infographic_count != 1 else ''} and {broll_count} "
         f"b-roll scene{'s' if broll_count != 1 else ''}. Review and edit it before approving."
     )
-    logger.info("generate_mapping endpoint: returning ChatResponse with %d scenes", len(scenes))
+
+    from backend.schemas import ChatMessage
+    session.chat_history = [ChatMessage(role="assistant", text=reply)]
+
+    logger.info("generate_mapping endpoint: persisting %d scenes for session %s", len(scenes), body.session_id)
+    await store.persist(session)
+    logger.info("generate_mapping endpoint: persist complete, building response")
+
     return ChatResponse(session_id=session.session_id, reply=reply, scenes=scenes)
 
 
@@ -415,11 +419,16 @@ async def chat(body: ChatRequest):
         raise HTTPException(status_code=400, detail="Mapping is locked â€” cannot edit after approval")
 
     try:
+        from backend.schemas import ChatMessage
+        session.chat_history.append(ChatMessage(role="user", text=body.message))
+
         updated_scenes, reply = await update_mapping_chat(
             scenes=session.scenes,
             user_message=body.message,
             _mode=session.mode,
         )
+
+        session.chat_history.append(ChatMessage(role="assistant", text=reply))
     except Exception as exc:
         logger.error("chat edit failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"LLM error: {exc}")

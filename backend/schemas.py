@@ -48,6 +48,11 @@ class StyleConfig(BaseModel):
     background_color: str
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str
+
+
 class Session(BaseModel):
     session_id: str
     mode: Literal["srt", "script"]
@@ -60,6 +65,7 @@ class Session(BaseModel):
     scene_count_hint: Optional[int] = None
 
     scenes: List[Scene] = Field(default_factory=list)
+    chat_history: List[ChatMessage] = Field(default_factory=list)
     approved: bool = False
 
     style: Optional[StyleConfig] = None

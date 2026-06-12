@@ -58,6 +58,7 @@ const MappingScreen = ({
   const [regenerating, setRegenerating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [detailsState, setDetailsState] = React.useState("split");
   const chatEndRef = React.useRef(null);
   const pad = density === "compact" ? 16 : 24;
   const isCardView = chatStyle === "card";
@@ -295,55 +296,113 @@ const MappingScreen = ({
     );
   };
 
+  const InsertDivider = ({ index }) => {
+    const [hovered, setHovered] = React.useState(false);
+    if (isApproved) return null;
+    return (
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          height: hovered ? 24 : 8,
+          margin: "-4px 0",
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+          zIndex: 10,
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          const draft = emptyScene(scenes.length + 1);
+          const next = [...scenes.slice(0, index), draft, ...scenes.slice(index)];
+          updateScenes(next, index + 1);
+        }}
+      >
+        <div style={{
+          position: "absolute",
+          left: 0, right: 0,
+          height: 2,
+          background: hovered ? a.main : "transparent",
+          transition: "all 0.15s ease",
+        }} />
+        <div style={{
+          position: "relative",
+          width: hovered ? 84 : 16,
+          height: 16,
+          borderRadius: 8,
+          background: hovered ? a.main : "transparent",
+          border: hovered ? "none" : `1px solid ${t.border}`,
+          color: hovered ? "#fff" : t.textSoft,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 9,
+          fontWeight: 600,
+          transition: "all 0.15s ease",
+          boxShadow: hovered ? "0 2px 4px rgba(0,0,0,0.15)" : "none",
+        }}>
+          <Icon name="plus" size={10} color={hovered ? "#fff" : t.textSoft} />
+          {hovered && <span style={{ marginLeft: 4 }}>Add Scene</span>}
+        </div>
+      </div>
+    );
+  };
+
   const CardView = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {scenes.map((scene) => {
+      <InsertDivider index={0} />
+      {scenes.map((scene, i) => {
         const active = selectedScene && selectedScene.id === scene.id;
         return (
-          <div
-            key={scene.id}
-            onClick={() => setSelectedId(scene.id)}
-            style={{
-              borderRadius: 8,
-              border: `1px solid ${active ? a.main : t.border}`,
-              background: active ? (theme === "light" ? a.light : t.bgSubtle) : t.bgSurface,
-              overflow: "hidden",
-              cursor: "pointer",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
-              <span style={{ width: 28, color: t.textSoft, fontSize: 11, fontFamily: FONTS.mono }}>
-                {String(scene.id).padStart(2, "0")}
-              </span>
-              <Badge type={scene.type} />
-              <span style={{ marginLeft: "auto", color: t.textSoft, fontSize: 10, fontFamily: FONTS.mono }}>
-                {formatSceneTime(scene)}
-              </span>
+          <React.Fragment key={scene.id}>
+            <div
+              onClick={() => setSelectedId(scene.id)}
+              style={{
+                borderRadius: 8,
+                border: `1px solid ${active ? a.main : t.border}`,
+                background: active ? (theme === "light" ? a.light : t.bgSubtle) : t.bgSurface,
+                overflow: "hidden",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
+                <span style={{ width: 28, color: t.textSoft, fontSize: 11, fontFamily: FONTS.mono }}>
+                  {String(scene.id).padStart(2, "0")}
+                </span>
+                <Badge type={scene.type} />
+                <span style={{ marginLeft: "auto", color: t.textSoft, fontSize: 10, fontFamily: FONTS.mono }}>
+                  {formatSceneTime(scene)}
+                </span>
+              </div>
+              <div style={{ padding: "0 12px 12px 50px" }}>
+                <textarea
+                  value={scene.description || ""}
+                  disabled={isApproved}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => patchScene(scene.id, { description: e.target.value })}
+                  placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
+                  rows={2}
+                  style={{
+                    width: "100%",
+                    resize: "vertical",
+                    minHeight: 48,
+                    borderRadius: 7,
+                    border: `1px solid ${t.border}`,
+                    background: t.bg,
+                    color: t.text,
+                    padding: "7px 9px",
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    outline: "none",
+                  }}
+                />
+              </div>
             </div>
-            <div style={{ padding: "0 12px 12px 50px" }}>
-              <textarea
-                value={scene.description || ""}
-                disabled={isApproved}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => patchScene(scene.id, { description: e.target.value })}
-                placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
-                rows={2}
-                style={{
-                  width: "100%",
-                  resize: "vertical",
-                  minHeight: 48,
-                  borderRadius: 7,
-                  border: `1px solid ${t.border}`,
-                  background: t.bg,
-                  color: t.text,
-                  padding: "7px 9px",
-                  fontSize: 12,
-                  lineHeight: 1.45,
-                  outline: "none",
-                }}
-              />
-            </div>
-          </div>
+            <InsertDivider index={i + 1} />
+          </React.Fragment>
         );
       })}
     </div>
@@ -367,7 +426,7 @@ const MappingScreen = ({
             Scene {String(selectedScene.id).padStart(2, "0")}
           </div>
           <Badge type={selectedScene.type} />
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
             <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={() => addSceneAt("before")} disabled={isApproved}>
               Before
             </Btn>
@@ -377,6 +436,21 @@ const MappingScreen = ({
             <Btn small variant="danger" icon="trash" theme={theme} accent={accent} onClick={() => deleteScene(selectedScene.id)} disabled={isApproved || scenes.length <= 1}>
               Delete
             </Btn>
+            <div style={{ width: 1, height: 16, background: t.border, margin: "0 6px" }} />
+            <button
+              onClick={() => setDetailsState(detailsState === "minimized" ? "split" : "minimized")}
+              title="Minimize details panel"
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: t.textSoft, display: "flex", alignItems: "center", justifyContent: "center", padding: 4, borderRadius: 4 }}
+            >
+              <Icon name="minimize" size={12} color={t.textSoft} />
+            </button>
+            <button
+              onClick={() => setDetailsState(detailsState === "maximized" ? "split" : "maximized")}
+              title={detailsState === "maximized" ? "Restore split layout" : "Maximize details panel"}
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: t.textSoft, display: "flex", alignItems: "center", justifyContent: "center", padding: 4, borderRadius: 4 }}
+            >
+              <Icon name={detailsState === "maximized" ? "restore" : "maximize"} size={12} color={t.textSoft} />
+            </button>
           </div>
         </div>
 
@@ -525,7 +599,13 @@ const MappingScreen = ({
                       <div key={label} style={{ fontSize: 10, fontWeight: 700, color: t.textSoft, letterSpacing: "0.06em" }}>{label}</div>
                     ))}
                   </div>
-                  {scenes.map((scene) => <SceneRow key={scene.id} scene={scene} />)}
+                  <InsertDivider index={0} />
+                  {scenes.map((scene, i) => (
+                    <React.Fragment key={scene.id}>
+                      <SceneRow scene={scene} />
+                      <InsertDivider index={i + 1} />
+                    </React.Fragment>
+                  ))}
                 </div>
               )
             ) : regenerating ? (
@@ -541,89 +621,148 @@ const MappingScreen = ({
         </div>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <EditorPanel />
+          {detailsState === "minimized" && (
+            <div
+              onClick={() => setDetailsState("split")}
+              style={{
+                height: 40,
+                background: t.bgSubtle,
+                borderBottom: `1px solid ${t.border}`,
+                display: "flex",
+                alignItems: "center",
+                padding: "0 16px",
+                cursor: "pointer",
+                justifyContent: "space-between",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 600, color: t.textMid }}>
+                Scene {selectedScene ? String(selectedScene.id).padStart(2, "0") : "--"} Details (Minimized)
+              </span>
+              <Btn small variant="ghost" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); setDetailsState("split"); }}>
+                Expand Details
+              </Btn>
+            </div>
+          )}
 
-          <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {messages.map((msg, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                  {msg.role === "assistant" && (
-                    <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
-                      <Icon name="sparkle" size={12} color="#fff" />
+          {detailsState !== "minimized" && (
+            <div style={{
+              flex: detailsState === "maximized" ? 1 : "0 0 auto",
+              maxHeight: detailsState === "maximized" ? "100%" : "60%",
+              overflow: "auto",
+              borderBottom: detailsState === "maximized" ? "none" : `1px solid ${t.border}`
+            }}>
+              <EditorPanel />
+            </div>
+          )}
+
+          {detailsState !== "maximized" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {messages.map((msg, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                      {msg.role === "assistant" && (
+                        <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
+                          <Icon name="sparkle" size={12} color="#fff" />
+                        </div>
+                      )}
+                      <div style={{
+                        maxWidth: "82%",
+                        padding: "9px 12px",
+                        borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
+                        background: msg.role === "user" ? a.main : t.bgSurface,
+                        border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
+                        color: msg.role === "user" ? "#fff" : t.text,
+                        fontSize: 12,
+                        lineHeight: 1.6,
+                      }}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
+                        <Icon name="sparkle" size={12} color="#fff" />
+                      </div>
+                      <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
+                        Thinking...
+                      </div>
                     </div>
                   )}
-                  <div style={{
-                    maxWidth: "82%",
-                    padding: "9px 12px",
-                    borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
-                    background: msg.role === "user" ? a.main : t.bgSurface,
-                    border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
-                    color: msg.role === "user" ? "#fff" : t.text,
-                    fontSize: 12,
-                    lineHeight: 1.6,
-                  }}>
-                    {msg.text}
-                  </div>
+                  <div ref={chatEndRef} />
                 </div>
-              ))}
-              {chatLoading && (
-                <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                  <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
-                    <Icon name="sparkle" size={12} color="#fff" />
-                  </div>
-                  <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
-                    Thinking...
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-          </div>
+              </div>
 
-          <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
-                rows={2}
-                disabled={chatLoading || regenerating || isApproved}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  resize: "none",
-                  border: `1px solid ${t.border}`,
-                  background: t.bg,
-                  color: t.text,
-                  fontSize: 12,
-                  outline: "none",
-                  lineHeight: 1.5,
-                  opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
-                }}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={chatLoading || !input.trim() || regenerating || isApproved}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  border: "none",
-                  background: a.main,
-                  cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
-                }}
-              >
-                <Icon name="send" size={14} color="#fff" />
-              </button>
+              <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                    placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
+                    rows={2}
+                    disabled={chatLoading || regenerating || isApproved}
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      resize: "none",
+                      border: `1px solid ${t.border}`,
+                      background: t.bg,
+                      color: t.text,
+                      fontSize: 12,
+                      outline: "none",
+                      lineHeight: 1.5,
+                      opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
+                    }}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={chatLoading || !input.trim() || regenerating || isApproved}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      border: "none",
+                      background: a.main,
+                      cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
+                    }}
+                  >
+                    <Icon name="send" size={14} color="#fff" />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {detailsState === "maximized" && (
+            <div
+              onClick={() => setDetailsState("split")}
+              style={{
+                height: 40,
+                background: t.bgSubtle,
+                borderTop: `1px solid ${t.border}`,
+                display: "flex",
+                alignItems: "center",
+                padding: "0 16px",
+                cursor: "pointer",
+                justifyContent: "space-between",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 11, color: t.textSoft }}>Chat history and AI edits are hidden.</span>
+              <Btn small variant="ghost" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); setDetailsState("split"); }}>
+                Show Chat
+              </Btn>
+            </div>
+          )}
         </div>
       </div>
     </div>

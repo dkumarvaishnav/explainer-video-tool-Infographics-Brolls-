@@ -80,7 +80,7 @@ const Icon = ({ name, size = 16, color = "currentColor", style: extraStyle }) =>
     chevronDown:  <><polyline points="6 9 12 15 18 9"/></>,
     star:       <><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></>,
     info:       <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
-    settings:   <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></>,
+    settings:   <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></>,
     sparkle:    <><path d="M9.937 15.5A2 2 0 008 17.5a2 2 0 01-2-2 2 2 0 00-2-2 2 2 0 012-2 2 2 0 002-2 2 2 0 002 2 2 2 0 012 2 2 2 0 01-2 2z"/><path d="M20 3a2 2 0 01-2 2 2 2 0 012 2 2 2 0 012-2 2 2 0 01-2-2zM17 8a2 2 0 01-2 2 2 2 0 012 2 2 2 0 012-2 2 2 0 01-2-2z"/></>,
     folder:     <><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></>,
     alertTriangle: <><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
@@ -89,6 +89,9 @@ const Icon = ({ name, size = 16, color = "currentColor", style: extraStyle }) =>
     copy:       <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></>,
     columns:    <><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></>,
     list:       <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
+    minimize:   <><line x1="5" y1="12" x2="19" y2="12"/></>,
+    maximize:   <><rect x="4" y="4" width="16" height="16" rx="2"/></>,
+    restore:    <><rect x="4" y="8" width="12" height="12" rx="2"/><path d="M9 8V5a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2h-3"/></>,
   };
   return (
     <svg
@@ -152,17 +155,105 @@ const PHASES = [
   { id: "prompts",  label: "Prompts",  icon: "copy",     sub: "Copy-ready" },
 ];
 
-const PhaseSidebar = ({ activePhase, theme, accent, onPhaseClick, compact }) => {
+const PhaseSidebar = ({
+  activePhase,
+  theme,
+  accent,
+  onPhaseClick,
+  compact,
+  sessions = [],
+  activeSessionId = null,
+  onSessionSelect = null,
+  onSessionDelete = null,
+}) => {
   const t = THEMES[theme];
   const a = ACCENTS[accent];
   const phaseIndex = PHASES.findIndex(p => p.id === activePhase);
   return (
     <div style={{
-      width: compact ? 56 : 200, background: t.sidebar, flexShrink: 0,
+      width: compact ? 56 : 300, background: t.sidebar, flexShrink: 0,
       display: "flex", flexDirection: "column",
       borderRight: `1px solid ${theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.05)"}`,
       transition: "width 0.2s ease",
+      overflow: "hidden",
     }}>
+      {!compact && (
+        <style>{`
+          .proj-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 0 10px;
+            overflow-y: auto;
+            flex: 1;
+          }
+          .proj-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-bottom: 2px;
+            background: transparent;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+          }
+          .proj-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+          }
+          .proj-row.active {
+            background: rgba(255, 255, 255, 0.08);
+          }
+          .proj-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+            text-align: left;
+          }
+          .proj-name {
+            font-size: 12.5px;
+            font-weight: 500;
+            color: ${t.sidebarText};
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .proj-row.active .proj-name {
+            color: ${t.sidebarActive};
+            font-weight: 600;
+          }
+          .proj-row:hover .proj-name {
+            color: ${t.sidebarActive};
+          }
+          .proj-delete-btn {
+            opacity: 0;
+            transition: all 0.15s ease;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-left: 6px;
+          }
+          .proj-row:hover .proj-delete-btn {
+            opacity: 0.5;
+          }
+          .proj-delete-btn:hover {
+            opacity: 1 !important;
+            background: rgba(255, 80, 80, 0.15);
+          }
+        `}</style>
+      )}
+
       {/* Logo */}
       <div style={{
         padding: compact ? "20px 0" : "20px 18px",
@@ -186,7 +277,7 @@ const PhaseSidebar = ({ activePhase, theme, accent, onPhaseClick, compact }) => 
       </div>
 
       {/* Nav items */}
-      <nav style={{ flex: 1, padding: compact ? "12px 0" : "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+      <nav style={{ padding: compact ? "12px 0" : "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
         {PHASES.map((phase, i) => {
           const isActive = phase.id === activePhase;
           const isDone = i < phaseIndex;
@@ -203,6 +294,7 @@ const PhaseSidebar = ({ activePhase, theme, accent, onPhaseClick, compact }) => 
                 justifyContent: compact ? "center" : "flex-start",
                 transition: "all 0.15s ease",
                 position: "relative",
+                width: "100%",
               }}
             >
               {isActive && (
@@ -233,9 +325,65 @@ const PhaseSidebar = ({ activePhase, theme, accent, onPhaseClick, compact }) => 
         })}
       </nav>
 
+      {/* Projects section */}
+      {!compact && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, borderTop: `1px solid rgba(255,255,255,0.04)` }}>
+          <div style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: t.sidebarText,
+            letterSpacing: "0.08em",
+            padding: "16px 18px 8px",
+          }}>
+            PROJECTS
+          </div>
+          <div className="proj-list-container">
+            {sessions.length > 0 ? (
+              sessions.map((s) => {
+                const isActive = s.session_id === activeSessionId;
+                const name = s.project_name || "Untitled Project";
+                return (
+                  <div
+                    key={s.session_id}
+                    className={`proj-row ${isActive ? "active" : ""}`}
+                    onClick={() => onSessionSelect && onSessionSelect(s.session_id)}
+                  >
+                    <div className="proj-info">
+                      <Icon
+                        name="folder"
+                        size={14}
+                        color={isActive ? a.main : t.sidebarText}
+                        style={{ opacity: isActive ? 1 : 0.7 }}
+                      />
+                      <span className="proj-name" title={name}>{name}</span>
+                    </div>
+                    {onSessionDelete && (
+                      <button
+                        className="proj-delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSessionDelete(s.session_id);
+                        }}
+                        title="Delete project"
+                      >
+                        <Icon name="trash" size={11} color="oklch(60% 0.14 20)" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ padding: "12px 18px", fontSize: 11, color: t.sidebarText, opacity: 0.5 }}>
+                No active projects.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Bottom */}
       {!compact && (
-        <div style={{ padding: "12px 10px", borderTop: `1px solid rgba(255,255,255,0.04)` }}>
+        <div style={{ padding: "12px 18px", borderTop: `1px solid rgba(255,255,255,0.04)`, flexShrink: 0 }}>
           <div style={{ fontSize: 10, color: t.sidebarText, letterSpacing: "0.03em" }}>v0.1.0 — localhost</div>
         </div>
       )}
