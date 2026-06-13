@@ -58,15 +58,28 @@ const MappingScreen = ({
   const [regenerating, setRegenerating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
-  const [detailsState, setDetailsState] = React.useState("split");
   const [leftColWidth, setLeftColWidth] = React.useState(62);
   const [isResizingCols, setIsResizingCols] = React.useState(false);
   const [detailsHeight, setDetailsHeight] = React.useState(350);
   const [isResizingDetails, setIsResizingDetails] = React.useState(false);
   const [reprocessingId, setReprocessingId] = React.useState(null);
+  const [isInfoOpen, setIsInfoOpen] = React.useState(false);
+  const [infoPanelDock, setInfoPanelDock] = React.useState("right");
+  const [isDraggingPanel, setIsDraggingPanel] = React.useState(false);
+  const [dragPreviewSide, setDragPreviewSide] = React.useState(null);
+  const [typeFilter, setTypeFilter] = React.useState(null);
   const chatEndRef = React.useRef(null);
   const pad = density === "compact" ? 16 : 24;
   const isCardView = chatStyle === "card";
+
+  const handleSceneClick = (id) => {
+    if (selectedId === id) {
+      setIsInfoOpen(!isInfoOpen);
+    } else {
+      setSelectedId(id);
+      setIsInfoOpen(true);
+    }
+  };
 
   const startResizingCols = (mouseDownEvent) => {
     mouseDownEvent.preventDefault();
@@ -105,6 +118,40 @@ const MappingScreen = ({
 
     const stopDrag = () => {
       setIsResizingDetails(false);
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+    };
+
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+  };
+
+  const startDraggingPanel = (mouseDownEvent) => {
+    if (mouseDownEvent.button !== 0) return;
+    if (
+      mouseDownEvent.target.closest('button') ||
+      mouseDownEvent.target.closest('select') ||
+      mouseDownEvent.target.closest('input') ||
+      mouseDownEvent.target.closest('textarea')
+    ) {
+      return;
+    }
+    mouseDownEvent.preventDefault();
+    setIsDraggingPanel(true);
+    setDragPreviewSide(infoPanelDock);
+
+    const doDrag = (mouseMoveEvent) => {
+      const screenWidth = window.innerWidth;
+      const hoverSide = mouseMoveEvent.clientX < screenWidth / 2 ? "left" : "right";
+      setDragPreviewSide(hoverSide);
+    };
+
+    const stopDrag = (mouseUpEvent) => {
+      setIsDraggingPanel(false);
+      const screenWidth = window.innerWidth;
+      const finalSide = mouseUpEvent.clientX < screenWidth / 2 ? "left" : "right";
+      setInfoPanelDock(finalSide);
+      setDragPreviewSide(null);
       window.removeEventListener('mousemove', doDrag);
       window.removeEventListener('mouseup', stopDrag);
     };
@@ -154,6 +201,7 @@ const MappingScreen = ({
     if (onScenesUpdated) onScenesUpdated(numbered);
     if (!numbered.length) {
       setSelectedId(null);
+      setIsInfoOpen(false);
       return;
     }
     const exists = numbered.some((scene) => scene.id === preferredSelectedId);
@@ -229,6 +277,7 @@ const MappingScreen = ({
     if (mode === "after" && selectedScene) index = scenes.findIndex((scene) => scene.id === selectedScene.id) + 1;
     const next = [...scenes.slice(0, index), draft, ...scenes.slice(index)];
     updateScenes(next, index + 1);
+    setIsInfoOpen(true);
   };
 
   const deleteScene = (id) => {
@@ -304,11 +353,13 @@ const MappingScreen = ({
     return acc;
   }, {});
 
+  const filteredScenes = typeFilter ? scenes.filter((scene) => scene.type === typeFilter) : scenes;
+
   const SceneRow = ({ scene, compact }) => {
     const active = selectedScene && selectedScene.id === scene.id;
     return (
       <div
-        onClick={() => setSelectedId(scene.id)}
+        onClick={() => handleSceneClick(scene.id)}
         style={{
           display: "grid",
           gridTemplateColumns: compact ? "32px 118px 1fr" : "34px 124px 116px 1fr",
@@ -374,7 +425,7 @@ const MappingScreen = ({
 
   const InsertDivider = ({ index }) => {
     const [hovered, setHovered] = React.useState(false);
-    if (isApproved) return null;
+    if (isApproved || typeFilter !== null) return null;
     return (
       <div
         onMouseEnter={() => setHovered(true)}
@@ -395,6 +446,7 @@ const MappingScreen = ({
           const draft = emptyScene(scenes.length + 1);
           const next = [...scenes.slice(0, index), draft, ...scenes.slice(index)];
           updateScenes(next, index + 1);
+          setIsInfoOpen(true);
         }}
       >
         <div style={{
@@ -427,62 +479,65 @@ const MappingScreen = ({
     );
   };
 
-  const CardView = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <InsertDivider index={0} />
-      {scenes.map((scene, i) => {
-        const active = selectedScene && selectedScene.id === scene.id;
-        return (
-          <React.Fragment key={scene.id}>
-            <div
-              onClick={() => setSelectedId(scene.id)}
-              style={{
-                borderRadius: 8,
-                border: `1px solid ${active ? a.main : t.border}`,
-                background: active ? (theme === "light" ? a.light : t.bgSubtle) : t.bgSurface,
-                overflow: "hidden",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
-                <span style={{ width: 28, color: t.textSoft, fontSize: 11, fontFamily: FONTS.mono }}>
-                  {String(scene.id).padStart(2, "0")}
-                </span>
-                <Badge type={scene.type} />
-                <span style={{ marginLeft: "auto", color: t.textSoft, fontSize: 10, fontFamily: FONTS.mono }}>
-                  {formatSceneTime(scene)}
-                </span>
+  const CardView = () => {
+    const filteredScenes = typeFilter ? scenes.filter((scene) => scene.type === typeFilter) : scenes;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {!typeFilter && <InsertDivider index={0} />}
+        {filteredScenes.map((scene, i) => {
+          const active = selectedScene && selectedScene.id === scene.id;
+          return (
+            <React.Fragment key={scene.id}>
+              <div
+                onClick={() => handleSceneClick(scene.id)}
+                style={{
+                  borderRadius: 8,
+                  border: `1px solid ${active ? a.main : t.border}`,
+                  background: active ? (theme === "light" ? a.light : t.bgSubtle) : t.bgSurface,
+                  overflow: "hidden",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
+                  <span style={{ width: 28, color: t.textSoft, fontSize: 11, fontFamily: FONTS.mono }}>
+                    {String(scene.id).padStart(2, "0")}
+                  </span>
+                  <Badge type={scene.type} />
+                  <span style={{ marginLeft: "auto", color: t.textSoft, fontSize: 10, fontFamily: FONTS.mono }}>
+                    {formatSceneTime(scene)}
+                  </span>
+                </div>
+                <div style={{ padding: "0 12px 12px 50px" }}>
+                  <textarea
+                    value={scene.description || ""}
+                    disabled={isApproved}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => patchScene(scene.id, { description: e.target.value })}
+                    placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
+                    rows={2}
+                    style={{
+                      width: "100%",
+                      resize: "vertical",
+                      minHeight: 48,
+                      borderRadius: 7,
+                      border: `1px solid ${t.border}`,
+                      background: t.bg,
+                      color: t.text,
+                      padding: "7px 9px",
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                      outline: "none",
+                    }}
+                  />
+                </div>
               </div>
-              <div style={{ padding: "0 12px 12px 50px" }}>
-                <textarea
-                  value={scene.description || ""}
-                  disabled={isApproved}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => patchScene(scene.id, { description: e.target.value })}
-                  placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
-                  rows={2}
-                  style={{
-                    width: "100%",
-                    resize: "vertical",
-                    minHeight: 48,
-                    borderRadius: 7,
-                    border: `1px solid ${t.border}`,
-                    background: t.bg,
-                    color: t.text,
-                    padding: "7px 9px",
-                    fontSize: 12,
-                    lineHeight: 1.45,
-                    outline: "none",
-                  }}
-                />
-              </div>
-            </div>
-            <InsertDivider index={i + 1} />
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
+              {!typeFilter && <InsertDivider index={i + 1} />}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
+  };
 
   const EditorPanel = () => {
     if (!selectedScene) {
@@ -497,35 +552,69 @@ const MappingScreen = ({
 
     return (
       <div style={{ padding: `${pad}px`, borderBottom: `1px solid ${t.border}`, background: t.bgSurface }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: t.textSoft, fontFamily: FONTS.mono }}>
-            Scene {String(selectedScene.id).padStart(2, "0")}
+        <div
+          onMouseDown={startDraggingPanel}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 12,
+            cursor: isDraggingPanel ? "grabbing" : "grab",
+            userSelect: "none",
+            padding: "4px 8px",
+            background: isDraggingPanel ? (theme === "light" ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.03)") : "transparent",
+            borderRadius: 6,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 4, color: t.textSoft }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 2, opacity: 0.6 }}>
+              <circle cx="9" cy="5" r="1" />
+              <circle cx="9" cy="12" r="1" />
+              <circle cx="9" cy="19" r="1" />
+              <circle cx="15" cy="5" r="1" />
+              <circle cx="15" cy="12" r="1" />
+              <circle cx="15" cy="19" r="1" />
+            </svg>
+            <div style={{ fontSize: 11, fontFamily: FONTS.mono }}>
+              Scene {String(selectedScene.id).padStart(2, "0")}
+            </div>
           </div>
           <Badge type={selectedScene.type} />
+          {isDraggingPanel && (
+            <span style={{ fontSize: 10, color: a.main, fontWeight: 600, marginLeft: 8 }}>
+              Drag to other side to dock
+            </span>
+          )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-            <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={() => addSceneAt("before")} disabled={isApproved}>
+            <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("before"); }} disabled={isApproved}>
               Before
             </Btn>
-            <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={() => addSceneAt("after")} disabled={isApproved}>
+            <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("after"); }} disabled={isApproved}>
               After
             </Btn>
-            <Btn small variant="danger" icon="trash" theme={theme} accent={accent} onClick={() => deleteScene(selectedScene.id)} disabled={isApproved || scenes.length <= 1}>
+            <Btn small variant="danger" icon="trash" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); deleteScene(selectedScene.id); }} disabled={isApproved || scenes.length <= 1}>
               Delete
             </Btn>
             <div style={{ width: 1, height: 16, background: t.border, margin: "0 6px" }} />
             <button
-              onClick={() => setDetailsState(detailsState === "minimized" ? "split" : "minimized")}
-              title="Minimize details panel"
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: t.textSoft, display: "flex", alignItems: "center", justifyContent: "center", padding: 4, borderRadius: 4 }}
+              onClick={(e) => { e.stopPropagation(); setIsInfoOpen(false); }}
+              title="Close details panel"
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: t.textSoft,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 4,
+                borderRadius: 4,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = a.main}
+              onMouseLeave={(e) => e.currentTarget.style.color = t.textSoft}
             >
-              <Icon name="minimize" size={12} color={t.textSoft} />
-            </button>
-            <button
-              onClick={() => setDetailsState(detailsState === "maximized" ? "split" : "maximized")}
-              title={detailsState === "maximized" ? "Restore split layout" : "Maximize details panel"}
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: t.textSoft, display: "flex", alignItems: "center", justifyContent: "center", padding: 4, borderRadius: 4 }}
-            >
-              <Icon name={detailsState === "maximized" ? "restore" : "maximize"} size={12} color={t.textSoft} />
+              <Icon name="x" size={14} color="currentColor" />
             </button>
           </div>
         </div>
@@ -654,13 +743,55 @@ const MappingScreen = ({
         }
       />
 
-      <div style={{ display: "flex", gap: 6, padding: `8px ${pad}px`, background: t.bgSurface, borderBottom: `1px solid ${t.border}`, alignItems: "center" }}>
-        {ASSET_TYPES.map((type) => (
-          <div key={type} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <Badge type={type} />
-            <span style={{ fontSize: 11, color: t.textSoft, fontFamily: FONTS.mono }}>{typeCount[type] || 0}</span>
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: 8, padding: `8px ${pad}px`, background: t.bgSurface, borderBottom: `1px solid ${t.border}`, alignItems: "center" }}>
+        {ASSET_TYPES.map((type) => {
+          const isActive = typeFilter === type;
+          return (
+            <div
+              key={type}
+              onClick={() => setTypeFilter(isActive ? null : type)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                cursor: "pointer",
+                padding: "4px 10px",
+                borderRadius: 20,
+                background: isActive ? a.light : "transparent",
+                border: `1px solid ${isActive ? a.main : "transparent"}`,
+                transition: "all 0.2s ease",
+                userSelect: "none",
+              }}
+              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = t.bgSubtle; }}
+              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+            >
+              <Badge type={type} />
+              <span style={{ fontSize: 11, color: isActive ? a.text : t.textSoft, fontFamily: FONTS.mono, fontWeight: isActive ? 600 : 500 }}>
+                {typeCount[type] || 0}
+              </span>
+            </div>
+          );
+        })}
+        {typeFilter && (
+          <button
+            onClick={() => setTypeFilter(null)}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 10,
+              color: a.main,
+              fontWeight: 600,
+              marginLeft: 4,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            Clear Filter
+            <Icon name="x" size={10} color={a.main} />
+          </button>
+        )}
         {isApproved && (
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, color: "oklch(35% 0.12 140)", background: "oklch(93% 0.07 140)", padding: "5px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
             <Icon name="lock" size={11} color="oklch(35% 0.12 140)" />
@@ -669,13 +800,47 @@ const MappingScreen = ({
         )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-          <div style={{ flex: "0 0 " + leftColWidth + "%", display: "flex", flexDirection: "column", overflow: "hidden", transition: isResizingCols ? "none" : "flex 0.2s ease" }}>
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+        <div style={{
+          flex: "0 0 " + leftColWidth + "%",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          transition: isResizingCols ? "none" : "flex 0.2s ease"
+        }}>
           {error && (
             <div style={{ margin: `${pad}px ${pad}px 0`, padding: "10px 14px", borderRadius: 8, background: "oklch(94% 0.08 20)", border: "1px solid oklch(80% 0.1 20)", fontSize: 12, color: "oklch(35% 0.14 20)", display: "flex", gap: 8, alignItems: "center" }}>
               <Icon name="alertTriangle" size={13} color="oklch(45% 0.16 20)" />
               {error}
             </div>
+          )}
+
+          {/* DOCKED LEFT EDITOR PANEL */}
+          {infoPanelDock === "left" && isInfoOpen && selectedScene && (
+            <>
+              <div style={{
+                flex: `0 0 ${detailsHeight}px`,
+                overflow: "auto",
+                borderBottom: `1px solid ${t.border}`,
+                background: t.bgSurface,
+                transition: isResizingDetails ? "none" : "flex 0.2s ease",
+              }}>
+                <EditorPanel />
+              </div>
+              <div
+                onMouseDown={startResizingDetails}
+                style={{
+                  height: "4px",
+                  background: isResizingDetails ? a.main : t.border,
+                  cursor: "row-resize",
+                  zIndex: 100,
+                  flexShrink: 0,
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => e.target.style.background = a.main}
+                onMouseLeave={(e) => { if (!isResizingDetails) e.target.style.background = t.border; }}
+              />
+            </>
           )}
 
           <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
@@ -689,11 +854,11 @@ const MappingScreen = ({
                       <div key={label} style={{ fontSize: 10, fontWeight: 700, color: t.textSoft, letterSpacing: "0.06em" }}>{label}</div>
                     ))}
                   </div>
-                  <InsertDivider index={0} />
-                  {scenes.map((scene, i) => (
+                  {!typeFilter && <InsertDivider index={0} />}
+                  {filteredScenes.map((scene, i) => (
                     <React.Fragment key={scene.id}>
                       <SceneRow scene={scene} />
-                      <InsertDivider index={i + 1} />
+                      {!typeFilter && <InsertDivider index={i + 1} />}
                     </React.Fragment>
                   ))}
                 </div>
@@ -725,164 +890,155 @@ const MappingScreen = ({
         />
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {detailsState === "minimized" && (
-            <div
-              onClick={() => setDetailsState("split")}
-              style={{
-                height: 40,
-                background: t.bgSubtle,
+          {/* DOCKED RIGHT EDITOR PANEL */}
+          {infoPanelDock === "right" && isInfoOpen && selectedScene && (
+            <>
+              <div style={{
+                flex: `0 0 ${detailsHeight}px`,
+                overflow: "auto",
                 borderBottom: `1px solid ${t.border}`,
-                display: "flex",
-                alignItems: "center",
-                padding: "0 16px",
-                cursor: "pointer",
-                justifyContent: "space-between",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 600, color: t.textMid }}>
-                Scene {selectedScene ? String(selectedScene.id).padStart(2, "0") : "--"} Details (Minimized)
-              </span>
-              <Btn small variant="ghost" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); setDetailsState("split"); }}>
-                Expand Details
-              </Btn>
-            </div>
+                background: t.bgSurface,
+                transition: isResizingDetails ? "none" : "flex 0.2s ease",
+              }}>
+                <EditorPanel />
+              </div>
+              <div
+                onMouseDown={startResizingDetails}
+                style={{
+                  height: "4px",
+                  background: isResizingDetails ? a.main : t.border,
+                  cursor: "row-resize",
+                  zIndex: 100,
+                  flexShrink: 0,
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => e.target.style.background = a.main}
+                onMouseLeave={(e) => { if (!isResizingDetails) e.target.style.background = t.border; }}
+              />
+            </>
           )}
 
-          {detailsState !== "minimized" && (
-            <div style={{
-              flex: detailsState === "maximized" ? 1 : "0 0 " + detailsHeight + "px",
-              overflow: "auto",
-              transition: isResizingDetails ? "none" : "flex 0.2s ease",
-            }}>
-              <EditorPanel />
-            </div>
-          )}
-
-          {detailsState === "split" && (
-            <div
-              onMouseDown={startResizingDetails}
-              style={{
-                height: "4px",
-                background: isResizingDetails ? a.main : t.border,
-                cursor: "row-resize",
-                zIndex: 100,
-                flexShrink: 0,
-                transition: "background 0.15s ease",
-              }}
-              onMouseEnter={(e) => e.target.style.background = a.main}
-              onMouseLeave={(e) => { if (!isResizingDetails) e.target.style.background = t.border; }}
-            />
-          )}
-
-          {detailsState !== "maximized" && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {messages.map((msg, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                      {msg.role === "assistant" && (
-                        <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
-                          <Icon name="sparkle" size={12} color="#fff" />
-                        </div>
-                      )}
-                      <div style={{
-                        maxWidth: "82%",
-                        padding: "9px 12px",
-                        borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
-                        background: msg.role === "user" ? a.main : t.bgSurface,
-                        border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
-                        color: msg.role === "user" ? "#fff" : t.text,
-                        fontSize: 12,
-                        lineHeight: 1.6,
-                      }}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {messages.map((msg, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                    {msg.role === "assistant" && (
+                      <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
                         <Icon name="sparkle" size={12} color="#fff" />
                       </div>
-                      <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
-                        Thinking...
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </div>
-
-              <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                    placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
-                    rows={2}
-                    disabled={chatLoading || regenerating || isApproved}
-                    style={{
-                      flex: 1,
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      resize: "none",
-                      border: `1px solid ${t.border}`,
-                      background: t.bg,
-                      color: t.text,
+                    )}
+                    <div style={{
+                      maxWidth: "82%",
+                      padding: "9px 12px",
+                      borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
+                      background: msg.role === "user" ? a.main : t.bgSurface,
+                      border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
+                      color: msg.role === "user" ? "#fff" : t.text,
                       fontSize: 12,
-                      outline: "none",
-                      lineHeight: 1.5,
-                      opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
-                    }}
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={chatLoading || !input.trim() || regenerating || isApproved}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      border: "none",
-                      background: a.main,
-                      cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
-                    }}
-                  >
-                    <Icon name="send" size={14} color="#fff" />
-                  </button>
-                </div>
+                      lineHeight: 1.6,
+                    }}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
+                      <Icon name="sparkle" size={12} color="#fff" />
+                    </div>
+                    <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
+                      Thinking...
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
               </div>
             </div>
-          )}
 
-          {detailsState === "maximized" && (
-            <div
-              onClick={() => setDetailsState("split")}
-              style={{
-                height: 40,
-                background: t.bgSubtle,
-                borderTop: `1px solid ${t.border}`,
-                display: "flex",
-                alignItems: "center",
-                padding: "0 16px",
-                cursor: "pointer",
-                justifyContent: "space-between",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ fontSize: 11, color: t.textSoft }}>Chat history and AI edits are hidden.</span>
-              <Btn small variant="ghost" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); setDetailsState("split"); }}>
-                Show Chat
-              </Btn>
+            <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                  placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
+                  rows={2}
+                  disabled={chatLoading || regenerating || isApproved}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    resize: "none",
+                    border: `1px solid ${t.border}`,
+                    background: t.bg,
+                    color: t.text,
+                    fontSize: 12,
+                    outline: "none",
+                    lineHeight: 1.5,
+                    opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
+                  }}
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={chatLoading || !input.trim() || regenerating || isApproved}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    border: "none",
+                    background: a.main,
+                    cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
+                  }}
+                >
+                  <Icon name="send" size={14} color="#fff" />
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
+
+        {/* DRAG AND DROP DOCK PREVIEW OVERLAY */}
+        {isDraggingPanel && dragPreviewSide && (
+          <div style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: dragPreviewSide === "left" ? 0 : "auto",
+            right: dragPreviewSide === "right" ? 0 : "auto",
+            width: dragPreviewSide === "left" ? `${leftColWidth}%` : `${100 - leftColWidth}%`,
+            background: `oklch(from ${a.main} l c h / 0.08)`,
+            border: `2px dashed ${a.main}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            pointerEvents: "none",
+            transition: "all 0.15s ease",
+          }}>
+            <div style={{
+              background: t.bgSurface,
+              border: `1px solid ${t.border}`,
+              padding: "12px 20px",
+              borderRadius: 8,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              color: a.main,
+              fontSize: 12,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}>
+              <Icon name="sparkle" size={14} color={a.main} />
+              Dock Info Panel Here
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
