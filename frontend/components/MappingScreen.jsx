@@ -59,9 +59,85 @@ const MappingScreen = ({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [detailsState, setDetailsState] = React.useState("split");
+  const [leftColWidth, setLeftColWidth] = React.useState(62);
+  const [isResizingCols, setIsResizingCols] = React.useState(false);
+  const [detailsHeight, setDetailsHeight] = React.useState(350);
+  const [isResizingDetails, setIsResizingDetails] = React.useState(false);
+  const [reprocessingId, setReprocessingId] = React.useState(null);
   const chatEndRef = React.useRef(null);
   const pad = density === "compact" ? 16 : 24;
   const isCardView = chatStyle === "card";
+
+  const startResizingCols = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizingCols(true);
+    const startX = mouseDownEvent.clientX;
+    const startWidth = leftColWidth;
+    const containerWidth = mouseDownEvent.currentTarget.parentElement.clientWidth;
+
+    const doDrag = (mouseMoveEvent) => {
+      const deltaX = mouseMoveEvent.clientX - startX;
+      const deltaPercent = (deltaX / containerWidth) * 100;
+      const newWidth = Math.max(30, Math.min(80, startWidth + deltaPercent));
+      setLeftColWidth(newWidth);
+    };
+
+    const stopDrag = () => {
+      setIsResizingCols(false);
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+    };
+
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+  };
+
+  const startResizingDetails = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizingDetails(true);
+    const startY = mouseDownEvent.clientY;
+    const startHeight = detailsHeight;
+
+    const doDrag = (mouseMoveEvent) => {
+      const newHeight = Math.max(150, Math.min(600, startHeight + (mouseMoveEvent.clientY - startY)));
+      setDetailsHeight(newHeight);
+    };
+
+    const stopDrag = () => {
+      setIsResizingDetails(false);
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+    };
+
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+  };
+
+  const handleReprocessScene = async (id, targetType) => {
+    setReprocessingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/reprocess-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          scene_id: id,
+          target_type: targetType,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Reprocessing failed" }));
+        throw new Error(err.detail || "Reprocessing failed");
+      }
+      const data = await res.json();
+      updateScenes(data.scenes, id);
+    } catch (e) {
+      setError(e.message || "Reprocessing failed");
+    } finally {
+      setReprocessingId(null);
+    }
+  };
 
   React.useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -457,14 +533,27 @@ const MappingScreen = ({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
             TYPE
-            <select
-              value={selectedScene.type}
-              disabled={isApproved}
-              onChange={(e) => patchScene(selectedScene.id, { type: e.target.value })}
-              style={{ padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
-            >
-              {ASSET_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
+            <div style={{ display: "flex", gap: 6 }}>
+              <select
+                value={selectedScene.type}
+                disabled={isApproved || reprocessingId !== null}
+                onChange={(e) => patchScene(selectedScene.id, { type: e.target.value })}
+                style={{ flex: 1, padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
+              >
+                {ASSET_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+              <Btn
+                small
+                variant="secondary"
+                icon={reprocessingId === selectedScene.id ? "refresh" : "sparkle"}
+                theme={theme}
+                accent={accent}
+                disabled={isApproved || reprocessingId !== null}
+                onClick={() => handleReprocessScene(selectedScene.id, selectedScene.type)}
+              >
+                {reprocessingId === selectedScene.id ? "Rewriting..." : "Re-process"}
+              </Btn>
+            </div>
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
             RATIO
@@ -476,6 +565,7 @@ const MappingScreen = ({
             >
               <option value="16:9">16:9</option>
               <option value="1:1">1:1</option>
+              <option value="9:16">9:16</option>
             </select>
           </label>
         </div>
@@ -580,7 +670,7 @@ const MappingScreen = ({
       </div>
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ flex: "0 0 62%", display: "flex", flexDirection: "column", overflow: "hidden", borderRight: `1px solid ${t.border}` }}>
+          <div style={{ flex: "0 0 " + leftColWidth + "%", display: "flex", flexDirection: "column", overflow: "hidden", transition: isResizingCols ? "none" : "flex 0.2s ease" }}>
           {error && (
             <div style={{ margin: `${pad}px ${pad}px 0`, padding: "10px 14px", borderRadius: 8, background: "oklch(94% 0.08 20)", border: "1px solid oklch(80% 0.1 20)", fontSize: 12, color: "oklch(35% 0.14 20)", display: "flex", gap: 8, alignItems: "center" }}>
               <Icon name="alertTriangle" size={13} color="oklch(45% 0.16 20)" />
@@ -620,6 +710,20 @@ const MappingScreen = ({
           </div>
         </div>
 
+        <div
+          onMouseDown={startResizingCols}
+          style={{
+            width: "4px",
+            background: isResizingCols ? a.main : t.border,
+            cursor: "col-resize",
+            zIndex: 100,
+            flexShrink: 0,
+            transition: "background 0.15s ease",
+          }}
+          onMouseEnter={(e) => e.target.style.background = a.main}
+          onMouseLeave={(e) => { if (!isResizingCols) e.target.style.background = t.border; }}
+        />
+
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {detailsState === "minimized" && (
             <div
@@ -647,13 +751,28 @@ const MappingScreen = ({
 
           {detailsState !== "minimized" && (
             <div style={{
-              flex: detailsState === "maximized" ? 1 : "0 0 auto",
-              maxHeight: detailsState === "maximized" ? "100%" : "60%",
+              flex: detailsState === "maximized" ? 1 : "0 0 " + detailsHeight + "px",
               overflow: "auto",
-              borderBottom: detailsState === "maximized" ? "none" : `1px solid ${t.border}`
+              transition: isResizingDetails ? "none" : "flex 0.2s ease",
             }}>
               <EditorPanel />
             </div>
+          )}
+
+          {detailsState === "split" && (
+            <div
+              onMouseDown={startResizingDetails}
+              style={{
+                height: "4px",
+                background: isResizingDetails ? a.main : t.border,
+                cursor: "row-resize",
+                zIndex: 100,
+                flexShrink: 0,
+                transition: "background 0.15s ease",
+              }}
+              onMouseEnter={(e) => e.target.style.background = a.main}
+              onMouseLeave={(e) => { if (!isResizingDetails) e.target.style.background = t.border; }}
+            />
           )}
 
           {detailsState !== "maximized" && (

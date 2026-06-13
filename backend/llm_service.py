@@ -27,7 +27,7 @@ MODEL_NAME = "gemini-2.5-flash"
 _GEMINI_TIMEOUT = 90.0
 
 _VALID_SCENE_TYPES = {"INFOGRAPHIC", "BROLL"}
-_VALID_ASPECT_RATIOS = {"1:1", "16:9"}
+_VALID_ASPECT_RATIOS = {"1:1", "16:9", "9:16"}
 _MAX_SCENE_SECONDS = 5.0
 
 
@@ -397,6 +397,39 @@ async def update_mapping_chat(
     if errors:
         raise ValueError(f"Chat edit produced invalid scenes: {errors}")
     return updated, reply
+
+
+async def reprocess_scene_brief(
+    source_text: str,
+    current_description: str,
+    target_type: str
+) -> str:
+    system_instruction = (
+        "You are a professional explainer-video visual planner.\n"
+        "You are tasked with rewriting a single scene's description brief to suit a new type.\n"
+        "If target is INFOGRAPHIC, describe a designed still visual (charts, graphic metaphors, diagrams, comparisons).\n"
+        "If target is BROLL, describe a video shot/sequence (subject, setting, action, camera movement, realism).\n"
+        "Keep the description concise (1-2 sentences), clear, and actionable for prompts.\n"
+        "Return the raw text of the new description only. No JSON, no markdown formatting."
+    )
+
+    user_prompt = (
+        f"Target Type: {target_type}\n"
+        f"Source script/text: {source_text}\n"
+        f"Current description: {current_description}\n\n"
+        f"Write the new {target_type} description brief."
+    )
+
+    response = await asyncio.wait_for(
+        _get_client().aio.models.generate_content(
+            model=MODEL_NAME,
+            contents=user_prompt,
+            config=_make_config(system_instruction, json_mode=False)
+        ),
+        timeout=_GEMINI_TIMEOUT
+    )
+
+    return response.text.strip()
 
 
 async def generate_prompt(

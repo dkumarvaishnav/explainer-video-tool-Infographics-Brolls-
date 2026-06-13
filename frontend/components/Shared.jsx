@@ -92,6 +92,7 @@ const Icon = ({ name, size = 16, color = "currentColor", style: extraStyle }) =>
     minimize:   <><line x1="5" y1="12" x2="19" y2="12"/></>,
     maximize:   <><rect x="4" y="4" width="16" height="16" rx="2"/></>,
     restore:    <><rect x="4" y="8" width="12" height="12" rx="2"/><path d="M9 8V5a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2h-3"/></>,
+    chevronLeft: <><polyline points="15 18 9 12 15 6"/></>,
   };
   return (
     <svg
@@ -165,6 +166,8 @@ const PhaseSidebar = ({
   activeSessionId = null,
   onSessionSelect = null,
   onSessionDelete = null,
+  onToggleCompact = null,
+  style = {},
 }) => {
   const t = THEMES[theme];
   const a = ACCENTS[accent];
@@ -176,6 +179,7 @@ const PhaseSidebar = ({
       borderRight: `1px solid ${theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.05)"}`,
       transition: "width 0.2s ease",
       overflow: "hidden",
+      ...style,
     }}>
       {!compact && (
         <style>{`
@@ -255,12 +259,17 @@ const PhaseSidebar = ({
       )}
 
       {/* Logo */}
-      <div style={{
-        padding: compact ? "20px 0" : "20px 18px",
-        display: "flex", alignItems: "center", gap: 10,
-        borderBottom: `1px solid ${theme === "light" ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)"}`,
-        justifyContent: compact ? "center" : "flex-start",
-      }}>
+      <div
+        onClick={compact ? onToggleCompact : undefined}
+        style={{
+          padding: compact ? "20px 0" : "20px 18px",
+          display: "flex", alignItems: "center", gap: 10,
+          borderBottom: `1px solid ${theme === "light" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)"}`,
+          justifyContent: compact ? "center" : "flex-start",
+          cursor: compact ? "pointer" : "default",
+        }}
+        title={compact ? "Expand sidebar" : undefined}
+      >
         <div style={{
           width: 28, height: 28, borderRadius: 8,
           background: a.main, display: "flex", alignItems: "center", justifyContent: "center",
@@ -269,10 +278,35 @@ const PhaseSidebar = ({
           <Icon name="layers" size={14} color="#fff" />
         </div>
         {!compact && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: "0.04em", lineHeight: 1.2 }}>OBVIOUS</div>
-            <div style={{ fontSize: 9, color: t.sidebarText, letterSpacing: "0.06em", lineHeight: 1.2 }}>INFOGRAPHICS</div>
-          </div>
+          <>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: "0.04em", lineHeight: 1.2 }}>OBVIOUS</div>
+              <div style={{ fontSize: 9, color: t.sidebarText, letterSpacing: "0.06em", lineHeight: 1.2 }}>INFOGRAPHICS</div>
+            </div>
+            {onToggleCompact && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleCompact(); }}
+                title="Collapse sidebar"
+                style={{
+                  marginLeft: "auto",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: t.sidebarText,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 4,
+                  borderRadius: 4,
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <Icon name="chevronLeft" size={14} color={t.sidebarText} />
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -412,7 +446,7 @@ const TopBar = ({ title, subtitle, theme, accent, actions }) => {
 };
 
 // ── Button ───────────────────────────────────────────────────────────────────
-const Btn = ({ children, variant = "primary", icon, theme, accent, onClick, disabled, small }) => {
+const Btn = ({ children, variant = "primary", icon, theme, accent, onClick, disabled, small, style = {} }) => {
   const t = THEMES[theme];
   const a = ACCENTS[accent];
   const [hov, setHov] = React.useState(false);
@@ -449,6 +483,7 @@ const Btn = ({ children, variant = "primary", icon, theme, accent, onClick, disa
         opacity: disabled ? 0.5 : 1,
         transition: "all 0.15s ease",
         background: s.bg, color: s.color, border: s.border || "none",
+        ...style,
       }}
     >
       {icon && <Icon name={icon} size={small ? 12 : 14} color={s.color} />}

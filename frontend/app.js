@@ -15,6 +15,29 @@ const AppShell = () => {
   const [promptScenes, setPromptScenes] = React.useState([]);
   const [mappingLocked, setMappingLocked] = React.useState(false);
   const [sessions, setSessions] = React.useState([]);
+  const [sidebarWidth, setSidebarWidth] = React.useState(300);
+  const [isResizingSidebar, setIsResizingSidebar] = React.useState(false);
+
+  const startResizingSidebar = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsResizingSidebar(true);
+    const startX = mouseDownEvent.clientX;
+    const startWidth = sidebarWidth;
+
+    const doDrag = (mouseMoveEvent) => {
+      const newWidth = Math.max(180, Math.min(480, startWidth + (mouseMoveEvent.clientX - startX)));
+      setSidebarWidth(newWidth);
+    };
+
+    const stopDrag = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+    };
+
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+  };
 
   React.useEffect(() => localStorage.setItem("theme", theme), [theme]);
   React.useEffect(() => localStorage.setItem("accent", accent), [accent]);
@@ -170,7 +193,25 @@ const AppShell = () => {
         activeSessionId={sessionId}
         onSessionSelect={handleLoadSession}
         onSessionDelete={handleDeleteSession}
+        onToggleCompact={() => setSidebarCompact(!sidebarCompact)}
+        style={{ width: sidebarCompact ? 56 : sidebarWidth, transition: isResizingSidebar ? "none" : "width 0.2s ease" }}
       />
+
+      {!sidebarCompact && (
+        <div
+          onMouseDown={startResizingSidebar}
+          style={{
+            width: "4px",
+            background: isResizingSidebar ? ACCENTS[accent].main : "transparent",
+            cursor: "col-resize",
+            zIndex: 100,
+            flexShrink: 0,
+            transition: "background 0.15s ease",
+          }}
+          onMouseEnter={(e) => e.target.style.background = ACCENTS[accent].main}
+          onMouseLeave={(e) => { if (!isResizingSidebar) e.target.style.background = "transparent"; }}
+        />
+      )}
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{

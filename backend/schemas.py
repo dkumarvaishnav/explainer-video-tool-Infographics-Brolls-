@@ -8,7 +8,7 @@ from typing import List, Optional, Literal
 # ---------------------------------------------------------------------------
 
 SceneType = Literal["INFOGRAPHIC", "BROLL"]
-AspectRatio = Literal["1:1", "16:9"]
+AspectRatio = Literal["1:1", "16:9", "9:16"]
 
 
 class Scene(BaseModel):
@@ -151,6 +151,12 @@ class ExportRequest(BaseModel):
     project_name: Optional[str] = None
     file_name: Optional[str] = None
     format: Literal["scene_list", "separated"] = "scene_list"
+
+
+class ReprocessSceneRequest(BaseModel):
+    session_id: str
+    scene_id: int
+    target_type: SceneType
 
 
 # ---------------------------------------------------------------------------

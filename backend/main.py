@@ -37,6 +37,7 @@ from backend.schemas import (
     StopRequest,
     UploadRequest,
     UpdateScenesRequest,
+    ReprocessSceneRequest,
 )
 from backend.session_store import store
 
@@ -466,6 +467,48 @@ async def update_scenes(body: UpdateScenesRequest):
         session_id=session.session_id,
         reply=f"Saved {len(scenes)} scene{'s' if len(scenes) != 1 else ''}.",
         scenes=scenes,
+    )
+
+
+@app.post("/reprocess-scene", response_model=ChatResponse, tags=["Phase 3 - Mapping"])
+async def reprocess_scene(body: ReprocessSceneRequest):
+    """
+    Reprocess a scene type (e.g. INFOGRAPHIC vs BROLL) using Gemini to rewrite the description brief.
+    """
+    from backend.llm_service import reprocess_scene_brief
+
+    session = store.get(body.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.approved:
+        raise HTTPException(status_code=400, detail="Mapping is locked")
+
+    scene = None
+    for s in session.scenes:
+        if s.id == body.scene_id:
+            scene = s
+            break
+    if scene is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+
+    scene.type = body.target_type
+    try:
+        new_description = await reprocess_scene_brief(
+            source_text=scene.source_text or "",
+            current_description=scene.description,
+            target_type=body.target_type,
+        )
+        scene.description = new_description
+        scene.prompt = None
+    except Exception as exc:
+        logger.error("Reprocess scene failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"LLM error: {exc}")
+
+    await store.persist(session)
+    return ChatResponse(
+        session_id=session.session_id,
+        reply=f"Scene {scene.id} re-processed as {body.target_type}.",
+        scenes=session.scenes,
     )
 
 
