@@ -64,6 +64,12 @@ const MappingScreen = ({
   const [reprocessingId, setReprocessingId] = React.useState(null);
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
   const [typeFilter, setTypeFilter] = React.useState(null);
+  const [infoDockMode, setInfoDockMode] = React.useState("column"); // "column" | "scenes-top" | "scenes-bottom" | "chat-top" | "chat-bottom"
+  const [colWidths3, setColWidths3] = React.useState([33.33, 33.33, 33.33]);
+  const [colWidths2, setColWidths2] = React.useState([50, 50]);
+  const [scenesRowRatio, setScenesRowRatio] = React.useState(50);
+  const [chatRowRatio, setChatRowRatio] = React.useState(50);
+  const [dragOverlayStyle, setDragOverlayStyle] = React.useState(null);
   const chatEndRef = React.useRef(null);
   const containerRef = React.useRef(null);
   const pad = density === "compact" ? 16 : 24;
@@ -76,6 +82,81 @@ const MappingScreen = ({
       setSelectedId(id);
       setIsInfoOpen(true);
     }
+  };
+
+  const activeColumns = React.useMemo(() => {
+    if (infoDockMode === "column") {
+      return panelOrder.filter(id => id !== "info" || isInfoOpen);
+    } else {
+      return panelOrder.filter(id => id === "scenes" || id === "chat");
+    }
+  }, [panelOrder, infoDockMode, isInfoOpen]);
+
+  const startResizingColumns = (mouseDownEvent, colIdx) => {
+    mouseDownEvent.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const startX = mouseDownEvent.clientX;
+
+    const isThree = (infoDockMode === "column" && isInfoOpen);
+    const currentWidths = isThree ? [...colWidths3] : [...colWidths2];
+
+    const doDrag = (mouseMoveEvent) => {
+      const deltaX = mouseMoveEvent.clientX - startX;
+      const deltaPct = (deltaX / rect.width) * 100;
+
+      const newWidths = [...currentWidths];
+      const wLeft = currentWidths[colIdx] + deltaPct;
+      const wRight = currentWidths[colIdx + 1] - deltaPct;
+
+      if (wLeft > 15 && wRight > 15) {
+        newWidths[colIdx] = wLeft;
+        newWidths[colIdx + 1] = wRight;
+        if (isThree) {
+          setColWidths3(newWidths);
+        } else {
+          setColWidths2(newWidths);
+        }
+      }
+    };
+
+    const stopDrag = () => {
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+    };
+
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
+  };
+
+  const startResizingRow = (mouseDownEvent, columnId) => {
+    mouseDownEvent.preventDefault();
+    const columnEl = document.getElementById(`column-${columnId}`);
+    if (!columnEl) return;
+    const rect = columnEl.getBoundingClientRect();
+    const startY = mouseDownEvent.clientY;
+    const currentRatio = columnId === "scenes" ? scenesRowRatio : chatRowRatio;
+
+    const doDrag = (mouseMoveEvent) => {
+      const deltaY = mouseMoveEvent.clientY - startY;
+      const deltaPct = (deltaY / rect.height) * 100;
+
+      const newRatio = Math.max(15, Math.min(85, currentRatio + deltaPct));
+      if (columnId === "scenes") {
+        setScenesRowRatio(newRatio);
+      } else {
+        setChatRowRatio(newRatio);
+      }
+    };
+
+    const stopDrag = () => {
+      window.removeEventListener('mousemove', doDrag);
+      window.removeEventListener('mouseup', stopDrag);
+    };
+
+    window.addEventListener('mousemove', doDrag);
+    window.addEventListener('mouseup', stopDrag);
   };
 
   const startDraggingPanelHeader = (mouseDownEvent, panelId) => {
@@ -91,51 +172,529 @@ const MappingScreen = ({
     mouseDownEvent.preventDefault();
     setDraggedPanelId(panelId);
 
-    const activePanels = panelOrder.filter(id => id !== "info" || isInfoOpen);
+    const isInfoOpenAtStart = isInfoOpen;
+    const infoDockModeAtStart = infoDockMode;
+    const activeColumnsAtStart = infoDockMode === "column"
+      ? panelOrder.filter(id => id !== "info" || isInfoOpen)
+      : panelOrder.filter(id => id === "scenes" || id === "chat");
+
+    let currentTarget = null;
 
     const doDrag = (mouseMoveEvent) => {
+      const x = mouseMoveEvent.clientX;
+      const y = mouseMoveEvent.clientY;
       const container = containerRef.current;
       if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const relativeX = mouseMoveEvent.clientX - rect.left;
-      const fraction = relativeX / rect.width;
-      const index = Math.max(0, Math.min(activePanels.length - 1, Math.floor(fraction * activePanels.length)));
-      setDraggedOverIndex(index);
+      const containerRect = container.getBoundingClientRect();
+
+      const scenesEl = document.getElementById("column-scenes");
+      const chatEl = document.getElementById("column-chat");
+
+      let target = null;
+      let style = null;
+
+      const isInside = (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+
+      if (panelId === "info") {
+        if (scenesEl && isInside(scenesEl.getBoundingClientRect())) {
+          const rect = scenesEl.getBoundingClientRect();
+          const relativeY = y - rect.top;
+          const pct = relativeY / rect.height;
+          if (pct < 0.2) {
+            target = { type: "split", target: "scenes", pos: "top" };
+            style = {
+              left: rect.left - containerRect.left,
+              top: rect.top - containerRect.top,
+              width: rect.width,
+              height: rect.height * 0.5,
+            };
+          } else if (pct > 0.8) {
+            target = { type: "split", target: "scenes", pos: "bottom" };
+            style = {
+              left: rect.left - containerRect.left,
+              top: rect.top - containerRect.top + rect.height * 0.5,
+              width: rect.width,
+              height: rect.height * 0.5,
+            };
+          }
+        } else if (chatEl && isInside(chatEl.getBoundingClientRect())) {
+          const rect = chatEl.getBoundingClientRect();
+          const relativeY = y - rect.top;
+          const pct = relativeY / rect.height;
+          if (pct < 0.2) {
+            target = { type: "split", target: "chat", pos: "top" };
+            style = {
+              left: rect.left - containerRect.left,
+              top: rect.top - containerRect.top,
+              width: rect.width,
+              height: rect.height * 0.5,
+            };
+          } else if (pct > 0.8) {
+            target = { type: "split", target: "chat", pos: "bottom" };
+            style = {
+              left: rect.left - containerRect.left,
+              top: rect.top - containerRect.top + rect.height * 0.5,
+              width: rect.width,
+              height: rect.height * 0.5,
+            };
+          }
+        }
+      }
+
+      if (!target) {
+        const isInfoDragging = panelId === "info";
+        const isInfoColumn = activeColumnsAtStart.includes("info");
+        const targetCount = (isInfoDragging && !isInfoColumn) ? activeColumnsAtStart.length + 1 : activeColumnsAtStart.length;
+        const relativeX = x - containerRect.left;
+        const fraction = relativeX / containerRect.width;
+        const index = Math.max(0, Math.min(targetCount - 1, Math.floor(fraction * targetCount)));
+
+        const colWidth = containerRect.width / targetCount;
+        target = { type: "column", index: index };
+        style = {
+          left: index * colWidth + 8,
+          top: 8,
+          width: colWidth - 16,
+          height: containerRect.height - 16,
+        };
+      }
+
+      currentTarget = target;
+      setDragOverlayStyle(style);
+      setDraggedOverIndex(target);
     };
 
     const stopDrag = (mouseUpEvent) => {
+      let target = currentTarget;
       const container = containerRef.current;
-      let targetIndex = draggedOverIndex;
-      if (container && targetIndex === null) {
-        const rect = container.getBoundingClientRect();
-        const relativeX = mouseUpEvent.clientX - rect.left;
-        const fraction = relativeX / rect.width;
-        targetIndex = Math.max(0, Math.min(activePanels.length - 1, Math.floor(fraction * activePanels.length)));
+      if (container && target === null) {
+        const x = mouseUpEvent.clientX;
+        const containerRect = container.getBoundingClientRect();
+        const isInfoDragging = panelId === "info";
+        const isInfoColumn = activeColumnsAtStart.includes("info");
+        const targetCount = (isInfoDragging && !isInfoColumn) ? activeColumnsAtStart.length + 1 : activeColumnsAtStart.length;
+        const relativeX = x - containerRect.left;
+        const fraction = relativeX / containerRect.width;
+        const index = Math.max(0, Math.min(targetCount - 1, Math.floor(fraction * targetCount)));
+        target = { type: "column", index: index };
       }
 
-      if (targetIndex !== null) {
-        setPanelOrder(prevOrder => {
-          const activeOrder = prevOrder.filter(id => id !== "info" || isInfoOpen);
-          const targetPanelId = activeOrder[targetIndex];
-          const newOrder = [...prevOrder];
-          const dragIdx = newOrder.indexOf(panelId);
-          const targetIdx = newOrder.indexOf(targetPanelId);
-          if (dragIdx !== -1 && targetIdx !== -1) {
-            newOrder[dragIdx] = targetPanelId;
-            newOrder[targetIdx] = panelId;
+      if (target) {
+        if (panelId === "info") {
+          if (target.type === "split") {
+            setInfoDockMode(`${target.target}-${target.pos}`);
+          } else if (target.type === "column") {
+            setInfoDockMode("column");
+            setPanelOrder(prevOrder => {
+              const activeOrder = prevOrder.filter(id => id !== "info" || isInfoOpenAtStart);
+              const targetPanelId = activeOrder[target.index];
+              const newOrder = [...prevOrder];
+              const dragIdx = newOrder.indexOf(panelId);
+              const targetIdx = newOrder.indexOf(targetPanelId);
+              if (dragIdx !== -1 && targetIdx !== -1) {
+                newOrder[dragIdx] = targetPanelId;
+                newOrder[targetIdx] = panelId;
+              }
+              return newOrder;
+            });
           }
-          return newOrder;
-        });
+        } else {
+          if (target.type === "column") {
+            setPanelOrder(prevOrder => {
+              const activeOrder = prevOrder.filter(id => id !== "info" || (isInfoOpenAtStart && infoDockModeAtStart === "column"));
+              const targetPanelId = activeOrder[target.index];
+              const newOrder = [...prevOrder];
+              const dragIdx = newOrder.indexOf(panelId);
+              const targetIdx = newOrder.indexOf(targetPanelId);
+              if (dragIdx !== -1 && targetIdx !== -1) {
+                newOrder[dragIdx] = targetPanelId;
+                newOrder[targetIdx] = panelId;
+              }
+              return newOrder;
+            });
+          }
+        }
       }
 
       setDraggedPanelId(null);
       setDraggedOverIndex(null);
+      setDragOverlayStyle(null);
       window.removeEventListener('mousemove', doDrag);
       window.removeEventListener('mouseup', stopDrag);
     };
 
     window.addEventListener('mousemove', doDrag);
     window.addEventListener('mouseup', stopDrag);
+  };
+
+  const renderScenesPanelContent = () => (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        background: t.bgSurface,
+        border: `1px solid ${t.border}`,
+        borderRadius: 8,
+        overflow: "hidden",
+        height: "100%",
+      }}
+    >
+      {/* Header */}
+      <div
+        onMouseDown={(e) => startDraggingPanelHeader(e, "scenes")}
+        style={{
+          height: 40,
+          padding: "0 12px",
+          background: t.bgSubtle,
+          borderBottom: `1px solid ${t.border}`,
+          display: "flex",
+          alignItems: "center",
+          cursor: draggedPanelId === "scenes" ? "grabbing" : "grab",
+          userSelect: "none",
+        }}
+      >
+        <Icon name="map" size={14} color={a.main} style={{ marginRight: 8 }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>Scene Plan</span>
+      </div>
+      {/* Content */}
+      <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
+        {error && (
+          <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, background: "oklch(94% 0.08 20)", border: "1px solid oklch(80% 0.1 20)", fontSize: 12, color: "oklch(35% 0.14 20)", display: "flex", gap: 8, alignItems: "center" }}>
+            <Icon name="alertTriangle" size={13} color="oklch(45% 0.16 20)" />
+            {error}
+          </div>
+        )}
+
+        {scenes.length > 0 ? (
+          isCardView ? (
+            <CardView />
+          ) : (
+            <div style={{ borderRadius: 8, border: `1px solid ${t.border}`, overflow: "hidden", background: t.bgSurface }}>
+              <div style={{ display: "grid", gridTemplateColumns: "34px 124px 116px 1fr", gap: 10, padding: "8px 14px", background: t.bgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                {["#", "Type", "Time", "Editable scene description"].map((label) => (
+                  <div key={label} style={{ fontSize: 10, fontWeight: 700, color: t.textSoft, letterSpacing: "0.06em" }}>{label}</div>
+                ))}
+              </div>
+              {!typeFilter && <InsertDivider index={0} />}
+              {filteredScenes.map((scene, i) => (
+                <React.Fragment key={scene.id}>
+                  <SceneRow scene={scene} />
+                  {!typeFilter && <InsertDivider index={i + 1} />}
+                </React.Fragment>
+              ))}
+            </div>
+          )
+        ) : regenerating ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
+            Generating scene plan with Gemini...
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
+            No scenes yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderInfoPanelContent = () => (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        background: t.bgSurface,
+        border: `1px solid ${t.border}`,
+        borderRadius: 8,
+        overflow: "hidden",
+        height: "100%",
+      }}
+    >
+      {/* Header */}
+      <div
+        onMouseDown={(e) => startDraggingPanelHeader(e, "info")}
+        style={{
+          height: 40,
+          padding: "0 12px",
+          background: t.bgSubtle,
+          borderBottom: `1px solid ${t.border}`,
+          display: "flex",
+          alignItems: "center",
+          cursor: draggedPanelId === "info" ? "grabbing" : "grab",
+          userSelect: "none",
+        }}
+      >
+        <Icon name="edit" size={14} color={a.main} style={{ marginRight: 8 }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>Scene Details</span>
+        <button
+          onClick={() => setIsInfoOpen(false)}
+          title="Close details"
+          style={{
+            marginLeft: "auto",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 4,
+            borderRadius: 4,
+            color: t.textSoft,
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = t.bgHover}
+          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+        >
+          <Icon name="x" size={14} color={t.textSoft} />
+        </button>
+      </div>
+      {/* Content */}
+      <div style={{ flex: 1, overflow: "auto" }}>
+        <EditorPanel />
+      </div>
+    </div>
+  );
+
+  const renderChatPanelContent = () => (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        background: t.bgSurface,
+        border: `1px solid ${t.border}`,
+        borderRadius: 8,
+        overflow: "hidden",
+        height: "100%",
+      }}
+    >
+      {/* Header */}
+      <div
+        onMouseDown={(e) => startDraggingPanelHeader(e, "chat")}
+        style={{
+          height: 40,
+          padding: "0 12px",
+          background: t.bgSubtle,
+          borderBottom: `1px solid ${t.border}`,
+          display: "flex",
+          alignItems: "center",
+          cursor: draggedPanelId === "chat" ? "grabbing" : "grab",
+          userSelect: "none",
+        }}
+      >
+        <Icon name="sparkle" size={14} color={a.main} style={{ marginRight: 8 }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>AI Assistant</span>
+      </div>
+      {/* Content */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                {msg.role === "assistant" && (
+                  <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
+                    <Icon name="sparkle" size={12} color="#fff" />
+                  </div>
+                )}
+                <div style={{
+                  maxWidth: "82%",
+                  padding: "9px 12px",
+                  borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
+                  background: msg.role === "user" ? a.main : t.bgSurface,
+                  border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
+                  color: msg.role === "user" ? "#fff" : t.text,
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                }}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
+                  <Icon name="sparkle" size={12} color="#fff" />
+                </div>
+                <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
+                  Thinking...
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+        </div>
+
+        <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
+              rows={2}
+              disabled={chatLoading || regenerating || isApproved}
+              style={{
+                flex: 1,
+                padding: "8px 12px",
+                borderRadius: 8,
+                resize: "none",
+                border: `1px solid ${t.border}`,
+                background: t.bg,
+                color: t.text,
+                fontSize: 12,
+                outline: "none",
+                lineHeight: 1.5,
+                opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={chatLoading || !input.trim() || regenerating || isApproved}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                border: "none",
+                background: a.main,
+                cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
+              }}
+            >
+              <Icon name="send" size={14} color="#fff" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderColumnContent = (colId) => {
+    if (colId === "scenes") {
+      if (isInfoOpen && infoDockMode === "scenes-top") {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <div style={{ height: `${scenesRowRatio}%`, minHeight: 0 }}>
+              {renderInfoPanelContent()}
+            </div>
+            <div
+              onMouseDown={(e) => startResizingRow(e, "scenes")}
+              style={{
+                height: 6,
+                margin: "-3px 0",
+                cursor: "row-resize",
+                zIndex: 100,
+                position: "relative",
+                flexShrink: 0,
+                background: "transparent",
+                transition: "background 0.2s ease",
+              }}
+              onMouseEnter={(e) => e.target.style.background = a.main}
+              onMouseLeave={(e) => e.target.style.background = "transparent"}
+            />
+            <div style={{ height: `${100 - scenesRowRatio}%`, minHeight: 0 }}>
+              {renderScenesPanelContent()}
+            </div>
+          </div>
+        );
+      }
+      if (isInfoOpen && infoDockMode === "scenes-bottom") {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <div style={{ height: `${scenesRowRatio}%`, minHeight: 0 }}>
+              {renderScenesPanelContent()}
+            </div>
+            <div
+              onMouseDown={(e) => startResizingRow(e, "scenes")}
+              style={{
+                height: 6,
+                margin: "-3px 0",
+                cursor: "row-resize",
+                zIndex: 100,
+                position: "relative",
+                flexShrink: 0,
+                background: "transparent",
+                transition: "background 0.2s ease",
+              }}
+              onMouseEnter={(e) => e.target.style.background = a.main}
+              onMouseLeave={(e) => e.target.style.background = "transparent"}
+            />
+            <div style={{ height: `${100 - scenesRowRatio}%`, minHeight: 0 }}>
+              {renderInfoPanelContent()}
+            </div>
+          </div>
+        );
+      }
+      return renderScenesPanelContent();
+    }
+
+    if (colId === "chat") {
+      if (isInfoOpen && infoDockMode === "chat-top") {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <div style={{ height: `${chatRowRatio}%`, minHeight: 0 }}>
+              {renderInfoPanelContent()}
+            </div>
+            <div
+              onMouseDown={(e) => startResizingRow(e, "chat")}
+              style={{
+                height: 6,
+                margin: "-3px 0",
+                cursor: "row-resize",
+                zIndex: 100,
+                position: "relative",
+                flexShrink: 0,
+                background: "transparent",
+                transition: "background 0.2s ease",
+              }}
+              onMouseEnter={(e) => e.target.style.background = a.main}
+              onMouseLeave={(e) => e.target.style.background = "transparent"}
+            />
+            <div style={{ height: `${100 - chatRowRatio}%`, minHeight: 0 }}>
+              {renderChatPanelContent()}
+            </div>
+          </div>
+        );
+      }
+      if (isInfoOpen && infoDockMode === "chat-bottom") {
+        return (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <div style={{ height: `${chatRowRatio}%`, minHeight: 0 }}>
+              {renderChatPanelContent()}
+            </div>
+            <div
+              onMouseDown={(e) => startResizingRow(e, "chat")}
+              style={{
+                height: 6,
+                margin: "-3px 0",
+                cursor: "row-resize",
+                zIndex: 100,
+                position: "relative",
+                flexShrink: 0,
+                background: "transparent",
+                transition: "background 0.2s ease",
+              }}
+              onMouseEnter={(e) => e.target.style.background = a.main}
+              onMouseLeave={(e) => e.target.style.background = "transparent"}
+            />
+            <div style={{ height: `${100 - chatRowRatio}%`, minHeight: 0 }}>
+              {renderInfoPanelContent()}
+            </div>
+          </div>
+        );
+      }
+      return renderChatPanelContent();
+    }
+
+    if (colId === "info") {
+      return renderInfoPanelContent();
+    }
+
+    return null;
   };
 
   const handleReprocessScene = async (id, targetType) => {
@@ -739,303 +1298,79 @@ const MappingScreen = ({
           background: t.bg,
         }}
       >
-        {panelOrder.filter(id => id !== "info" || isInfoOpen).map((panelId) => {
-          if (panelId === "scenes") {
-            return (
+        {activeColumns.map((colId, index) => {
+          const width = activeColumns.length === 3
+            ? colWidths3[index]
+            : (activeColumns.length === 2 ? colWidths2[index] : 100);
+          return (
+            <React.Fragment key={colId}>
               <div
-                key="scenes"
+                id={`column-${colId}`}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
+                  width: `${width}%`,
                   display: "flex",
                   flexDirection: "column",
-                  background: t.bgSurface,
-                  border: `1px solid ${t.border}`,
-                  borderRadius: 8,
                   overflow: "hidden",
+                  height: "100%",
                 }}
               >
-                {/* Header */}
-                <div
-                  onMouseDown={(e) => startDraggingPanelHeader(e, "scenes")}
-                  style={{
-                    height: 40,
-                    padding: "0 12px",
-                    background: t.bgSubtle,
-                    borderBottom: `1px solid ${t.border}`,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: draggedPanelId === "scenes" ? "grabbing" : "grab",
-                    userSelect: "none",
-                  }}
-                >
-                  <Icon name="map" size={14} color={a.main} style={{ marginRight: 8 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>Scene Plan</span>
-                </div>
-                {/* Content */}
-                <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
-                  {error && (
-                    <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, background: "oklch(94% 0.08 20)", border: "1px solid oklch(80% 0.1 20)", fontSize: 12, color: "oklch(35% 0.14 20)", display: "flex", gap: 8, alignItems: "center" }}>
-                      <Icon name="alertTriangle" size={13} color="oklch(45% 0.16 20)" />
-                      {error}
-                    </div>
-                  )}
-
-                  {scenes.length > 0 ? (
-                    isCardView ? (
-                      <CardView />
-                    ) : (
-                      <div style={{ borderRadius: 8, border: `1px solid ${t.border}`, overflow: "hidden", background: t.bgSurface }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "34px 124px 116px 1fr", gap: 10, padding: "8px 14px", background: t.bgSubtle, borderBottom: `1px solid ${t.border}` }}>
-                          {["#", "Type", "Time", "Editable scene description"].map((label) => (
-                            <div key={label} style={{ fontSize: 10, fontWeight: 700, color: t.textSoft, letterSpacing: "0.06em" }}>{label}</div>
-                          ))}
-                        </div>
-                        {!typeFilter && <InsertDivider index={0} />}
-                        {filteredScenes.map((scene, i) => (
-                          <React.Fragment key={scene.id}>
-                            <SceneRow scene={scene} />
-                            {!typeFilter && <InsertDivider index={i + 1} />}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    )
-                  ) : regenerating ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
-                      Generating scene plan with Gemini...
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
-                      No scenes yet.
-                    </div>
-                  )}
-                </div>
+                {renderColumnContent(colId)}
               </div>
-            );
-          }
 
-          if (panelId === "info") {
-            return (
-              <div
-                key="info"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  background: t.bgSurface,
-                  border: `1px solid ${t.border}`,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Header */}
+              {index < activeColumns.length - 1 && (
                 <div
-                  onMouseDown={(e) => startDraggingPanelHeader(e, "info")}
+                  onMouseDown={(e) => startResizingColumns(e, index)}
                   style={{
-                    height: 40,
-                    padding: "0 12px",
-                    background: t.bgSubtle,
-                    borderBottom: `1px solid ${t.border}`,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: draggedPanelId === "info" ? "grabbing" : "grab",
-                    userSelect: "none",
+                    width: 6,
+                    margin: "0 -3px",
+                    cursor: "col-resize",
+                    zIndex: 100,
+                    position: "relative",
+                    flexShrink: 0,
+                    background: "transparent",
+                    transition: "background 0.2s ease",
                   }}
-                >
-                  <Icon name="edit" size={14} color={a.main} style={{ marginRight: 8 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>Scene Details</span>
-                  <button
-                    onClick={() => setIsInfoOpen(false)}
-                    title="Close details"
-                    style={{
-                      marginLeft: "auto",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 4,
-                      borderRadius: 4,
-                      color: t.textSoft,
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = t.bgHover}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    <Icon name="x" size={14} color={t.textSoft} />
-                  </button>
-                </div>
-                {/* Content */}
-                <div style={{ flex: 1, overflow: "auto" }}>
-                  <EditorPanel />
-                </div>
-              </div>
-            );
-          }
-
-          if (panelId === "chat") {
-            return (
-              <div
-                key="chat"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  background: t.bgSurface,
-                  border: `1px solid ${t.border}`,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Header */}
-                <div
-                  onMouseDown={(e) => startDraggingPanelHeader(e, "chat")}
-                  style={{
-                    height: 40,
-                    padding: "0 12px",
-                    background: t.bgSubtle,
-                    borderBottom: `1px solid ${t.border}`,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: draggedPanelId === "chat" ? "grabbing" : "grab",
-                    userSelect: "none",
-                  }}
-                >
-                  <Icon name="sparkle" size={14} color={a.main} style={{ marginRight: 8 }} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>AI Assistant</span>
-                </div>
-                {/* Content */}
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                  <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {messages.map((msg, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                          {msg.role === "assistant" && (
-                            <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
-                              <Icon name="sparkle" size={12} color="#fff" />
-                            </div>
-                          )}
-                          <div style={{
-                            maxWidth: "82%",
-                            padding: "9px 12px",
-                            borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
-                            background: msg.role === "user" ? a.main : t.bgSurface,
-                            border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
-                            color: msg.role === "user" ? "#fff" : t.text,
-                            fontSize: 12,
-                            lineHeight: 1.6,
-                          }}>
-                            {msg.text}
-                          </div>
-                        </div>
-                      ))}
-                      {chatLoading && (
-                        <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                          <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
-                            <Icon name="sparkle" size={12} color="#fff" />
-                          </div>
-                          <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
-                            Thinking...
-                          </div>
-                        </div>
-                      )}
-                      <div ref={chatEndRef} />
-                    </div>
-                  </div>
-
-                  <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                      <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                        placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
-                        rows={2}
-                        disabled={chatLoading || regenerating || isApproved}
-                        style={{
-                          flex: 1,
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          resize: "none",
-                          border: `1px solid ${t.border}`,
-                          background: t.bg,
-                          color: t.text,
-                          fontSize: 12,
-                          outline: "none",
-                          lineHeight: 1.5,
-                          opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
-                        }}
-                      />
-                      <button
-                        onClick={sendMessage}
-                        disabled={chatLoading || !input.trim() || regenerating || isApproved}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          border: "none",
-                          background: a.main,
-                          cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
-                        }}
-                      >
-                        <Icon name="send" size={14} color="#fff" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          }
-          return null;
+                  onMouseEnter={(e) => e.target.style.background = a.main}
+                  onMouseLeave={(e) => e.target.style.background = "transparent"}
+                />
+              )}
+            </React.Fragment>
+          );
         })}
 
         {/* DRAG AND DROP DOCK PREVIEW OVERLAY */}
-        {draggedPanelId !== null && draggedOverIndex !== null && (() => {
-          const activePanels = panelOrder.filter(id => id !== "info" || isInfoOpen);
-          return (
+        {draggedPanelId !== null && dragOverlayStyle && (
+          <div style={{
+            position: "absolute",
+            background: `oklch(from ${a.main} l c h / 0.08)`,
+            border: `2px dashed ${a.main}`,
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            pointerEvents: "none",
+            transition: "all 0.15s ease",
+            ...dragOverlayStyle
+          }}>
             <div style={{
-              position: "absolute",
-              top: 8,
-              bottom: 8,
-              left: `calc(8px + ${draggedOverIndex} * (100% - 8px) / ${activePanels.length})`,
-              width: `calc((100% - 8px * (${activePanels.length} + 1)) / ${activePanels.length})`,
-              background: `oklch(from ${a.main} l c h / 0.08)`,
-              border: `2px dashed ${a.main}`,
+              background: t.bgSurface,
+              border: `1px solid ${t.border}`,
+              padding: "12px 20px",
               borderRadius: 8,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              color: a.main,
+              fontSize: 12,
+              fontWeight: 600,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1000,
-              pointerEvents: "none",
-              transition: "left 0.15s ease",
+              gap: 8,
             }}>
-              <div style={{
-                background: t.bgSurface,
-                border: `1px solid ${t.border}`,
-                padding: "12px 20px",
-                borderRadius: 8,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                color: a.main,
-                fontSize: 12,
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}>
-                <Icon name="sparkle" size={14} color={a.main} />
-                Drop Panel Here
-              </div>
+              <Icon name="sparkle" size={14} color={a.main} />
+              Drop Panel Here
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     </div>
   );
