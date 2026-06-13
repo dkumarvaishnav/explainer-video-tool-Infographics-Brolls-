@@ -137,7 +137,8 @@ const AppShell = () => {
 
   const handlePhaseClick = (targetPhase) => {
     const targetIndex = phaseOrder.indexOf(targetPhase);
-    if (sessionId && targetIndex <= currentPhaseIndex) {
+    const maxPhaseIndex = mappingLocked ? 2 : currentPhaseIndex;
+    if (sessionId && targetIndex <= maxPhaseIndex) {
       setPhase(targetPhase);
     }
   };

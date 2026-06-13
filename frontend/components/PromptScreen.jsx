@@ -187,21 +187,22 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
         <textarea
           value={scene.prompt || ""}
           onChange={(e) => setPrompt(scene.id, e.target.value)}
-          rows={compact ? 5 : 7}
+          rows={5}
           placeholder={loading ? "Generating prompt..." : "Prompt will appear here."}
           style={{
             width: "100%",
             display: "block",
             resize: "vertical",
-            minHeight: compact ? 118 : 160,
+            height: 115,
+            minHeight: 115,
             border: "none",
             borderRadius: 0,
             outline: "none",
             background: t.bgSurface,
             color: t.text,
-            padding: compact ? "10px 12px" : "12px 14px",
+            padding: "10px 12px",
             fontSize: 12,
-            lineHeight: 1.65,
+            lineHeight: 1.6,
             fontFamily: FONTS.mono,
           }}
         />

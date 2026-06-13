@@ -63,6 +63,7 @@ const MappingScreen = ({
   const [draggedOverIndex, setDraggedOverIndex] = React.useState(null);
   const [reprocessingId, setReprocessingId] = React.useState(null);
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
+  const [isChatOpen, setIsChatOpen] = React.useState(true);
   const [typeFilter, setTypeFilter] = React.useState(null);
   const [infoDockMode, setInfoDockMode] = React.useState("column"); // "column" | "scenes-top" | "scenes-bottom" | "chat-top" | "chat-bottom"
   const [colWidths3, setColWidths3] = React.useState([33.33, 33.33, 33.33]);
@@ -84,13 +85,25 @@ const MappingScreen = ({
     }
   };
 
-  const activeColumns = React.useMemo(() => {
-    if (infoDockMode === "column") {
-      return panelOrder.filter(id => id !== "info" || isInfoOpen);
-    } else {
-      return panelOrder.filter(id => id === "scenes" || id === "chat");
+  const effectiveDockMode = React.useMemo(() => {
+    if (infoDockMode.startsWith("chat-") && !isChatOpen) {
+      return "column";
     }
-  }, [panelOrder, infoDockMode, isInfoOpen]);
+    return infoDockMode;
+  }, [infoDockMode, isChatOpen]);
+
+  const activeColumns = React.useMemo(() => {
+    if (effectiveDockMode === "column") {
+      return panelOrder.filter(id => {
+        if (id === "scenes") return true;
+        if (id === "info") return isInfoOpen;
+        if (id === "chat") return isChatOpen;
+        return false;
+      });
+    } else {
+      return panelOrder.filter(id => id === "scenes" || (id === "chat" && isChatOpen));
+    }
+  }, [panelOrder, effectiveDockMode, isInfoOpen, isChatOpen]);
 
   const startResizingColumns = (mouseDownEvent, colIdx) => {
     mouseDownEvent.preventDefault();
@@ -99,7 +112,7 @@ const MappingScreen = ({
     const rect = container.getBoundingClientRect();
     const startX = mouseDownEvent.clientX;
 
-    const isThree = (infoDockMode === "column" && isInfoOpen);
+    const isThree = (activeColumns.length === 3);
     const currentWidths = isThree ? [...colWidths3] : [...colWidths2];
 
     const doDrag = (mouseMoveEvent) => {
@@ -173,10 +186,11 @@ const MappingScreen = ({
     setDraggedPanelId(panelId);
 
     const isInfoOpenAtStart = isInfoOpen;
+    const isChatOpenAtStart = isChatOpen;
     const infoDockModeAtStart = infoDockMode;
     const activeColumnsAtStart = infoDockMode === "column"
-      ? panelOrder.filter(id => id !== "info" || isInfoOpen)
-      : panelOrder.filter(id => id === "scenes" || id === "chat");
+      ? panelOrder.filter(id => (id === "scenes") || (id === "info" && isInfoOpen) || (id === "chat" && isChatOpen))
+      : panelOrder.filter(id => id === "scenes" || (id === "chat" && isChatOpen));
 
     let currentTarget = null;
 
@@ -217,7 +231,7 @@ const MappingScreen = ({
               height: rect.height * 0.5,
             };
           }
-        } else if (chatEl && isInside(chatEl.getBoundingClientRect())) {
+        } else if (chatEl && isInside(chatEl.getBoundingClientRect()) && isChatOpenAtStart) {
           const rect = chatEl.getBoundingClientRect();
           const relativeY = y - rect.top;
           const pct = relativeY / rect.height;
@@ -286,7 +300,12 @@ const MappingScreen = ({
           } else if (target.type === "column") {
             setInfoDockMode("column");
             setPanelOrder(prevOrder => {
-              const activeOrder = prevOrder.filter(id => id !== "info" || isInfoOpenAtStart);
+              const activeOrder = prevOrder.filter(id => {
+                if (id === "scenes") return true;
+                if (id === "info") return isInfoOpenAtStart;
+                if (id === "chat") return isChatOpenAtStart;
+                return false;
+              });
               const targetPanelId = activeOrder[target.index];
               const newOrder = [...prevOrder];
               const dragIdx = newOrder.indexOf(panelId);
@@ -301,7 +320,12 @@ const MappingScreen = ({
         } else {
           if (target.type === "column") {
             setPanelOrder(prevOrder => {
-              const activeOrder = prevOrder.filter(id => id !== "info" || (isInfoOpenAtStart && infoDockModeAtStart === "column"));
+              const activeOrder = prevOrder.filter(id => {
+                if (id === "scenes") return true;
+                if (id === "info") return isInfoOpenAtStart && infoDockModeAtStart === "column";
+                if (id === "chat") return isChatOpenAtStart;
+                return false;
+              });
               const targetPanelId = activeOrder[target.index];
               const newOrder = [...prevOrder];
               const dragIdx = newOrder.indexOf(panelId);
@@ -485,6 +509,27 @@ const MappingScreen = ({
       >
         <Icon name="sparkle" size={14} color={a.main} style={{ marginRight: 8 }} />
         <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>AI Assistant</span>
+        <button
+          onClick={() => setIsChatOpen(false)}
+          title="Close chat"
+          style={{
+            marginLeft: "auto",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 4,
+            borderRadius: 4,
+            color: t.textSoft,
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = t.bgHover}
+          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+        >
+          <Icon name="x" size={14} color={t.textSoft} />
+        </button>
       </div>
       {/* Content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -575,7 +620,7 @@ const MappingScreen = ({
 
   const renderColumnContent = (colId) => {
     if (colId === "scenes") {
-      if (isInfoOpen && infoDockMode === "scenes-top") {
+      if (isInfoOpen && effectiveDockMode === "scenes-top") {
         return (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <div style={{ height: `${scenesRowRatio}%`, minHeight: 0 }}>
@@ -602,7 +647,7 @@ const MappingScreen = ({
           </div>
         );
       }
-      if (isInfoOpen && infoDockMode === "scenes-bottom") {
+      if (isInfoOpen && effectiveDockMode === "scenes-bottom") {
         return (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <div style={{ height: `${scenesRowRatio}%`, minHeight: 0 }}>
@@ -633,7 +678,7 @@ const MappingScreen = ({
     }
 
     if (colId === "chat") {
-      if (isInfoOpen && infoDockMode === "chat-top") {
+      if (isInfoOpen && effectiveDockMode === "chat-top") {
         return (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <div style={{ height: `${chatRowRatio}%`, minHeight: 0 }}>
@@ -660,7 +705,7 @@ const MappingScreen = ({
           </div>
         );
       }
-      if (isInfoOpen && infoDockMode === "chat-bottom") {
+      if (isInfoOpen && effectiveDockMode === "chat-bottom") {
         return (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <div style={{ height: `${chatRowRatio}%`, minHeight: 0 }}>
@@ -893,10 +938,13 @@ const MappingScreen = ({
   const filteredScenes = typeFilter ? scenes.filter((scene) => scene.type === typeFilter) : scenes;
 
   const SceneRow = ({ scene, compact }) => {
-    const active = selectedScene && selectedScene.id === scene.id;
+    const [hovered, setHovered] = React.useState(false);
+    const active = isInfoOpen && selectedId === scene.id;
     return (
       <div
         onClick={() => handleSceneClick(scene.id)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
           display: "grid",
           gridTemplateColumns: compact ? "32px 118px 1fr" : "34px 124px 116px 1fr",
@@ -904,8 +952,10 @@ const MappingScreen = ({
           alignItems: compact ? "center" : "start",
           padding: compact ? "10px 12px" : "12px 14px",
           borderBottom: `1px solid ${t.border}`,
-          background: active ? (theme === "light" ? a.light : t.bgSubtle) : t.bgSurface,
-          borderLeft: `3px solid ${active ? a.main : "transparent"}`,
+          background: active 
+            ? (theme === "light" ? a.light : t.bgSubtle) 
+            : (hovered ? t.bgHover : t.bgSurface),
+          borderLeft: `3px solid ${active ? a.main : (hovered ? (theme === "light" ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.15)") : "transparent")}`,
           cursor: "pointer",
         }}
       >
@@ -1016,58 +1066,70 @@ const MappingScreen = ({
     );
   };
 
+  const CardItem = ({ scene }) => {
+    const [hovered, setHovered] = React.useState(false);
+    const active = isInfoOpen && selectedId === scene.id;
+    return (
+      <div
+        onClick={() => handleSceneClick(scene.id)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          borderRadius: 8,
+          border: `1px solid ${active ? a.main : (hovered ? a.main : t.border)}`,
+          background: active 
+            ? (theme === "light" ? a.light : t.bgSubtle) 
+            : (hovered ? t.bgHover : t.bgSurface),
+          overflow: "hidden",
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
+          <span style={{ width: 28, color: t.textSoft, fontSize: 11, fontFamily: FONTS.mono }}>
+            {String(scene.id).padStart(2, "0")}
+          </span>
+          <Badge type={scene.type} />
+          <span style={{ marginLeft: "auto", color: t.textSoft, fontSize: 10, fontFamily: FONTS.mono }}>
+            {formatSceneTime(scene)}
+          </span>
+        </div>
+        <div style={{ padding: "0 12px 12px 50px" }}>
+          <textarea
+            value={scene.description || ""}
+            disabled={isApproved}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => patchScene(scene.id, { description: e.target.value })}
+            placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
+            rows={2}
+            style={{
+              width: "100%",
+              resize: "vertical",
+              minHeight: 48,
+              borderRadius: 7,
+              border: `1px solid ${t.border}`,
+              background: t.bg,
+              color: t.text,
+              padding: "7px 9px",
+              fontSize: 12,
+              lineHeight: 1.45,
+              outline: "none",
+            }}
+          />
+        </div>
+      </div>
+    );
+  };
+
   const CardView = () => {
     const filteredScenes = typeFilter ? scenes.filter((scene) => scene.type === typeFilter) : scenes;
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {!typeFilter && <InsertDivider index={0} />}
         {filteredScenes.map((scene, i) => {
-          const active = selectedScene && selectedScene.id === scene.id;
           return (
             <React.Fragment key={scene.id}>
-              <div
-                onClick={() => handleSceneClick(scene.id)}
-                style={{
-                  borderRadius: 8,
-                  border: `1px solid ${active ? a.main : t.border}`,
-                  background: active ? (theme === "light" ? a.light : t.bgSubtle) : t.bgSurface,
-                  overflow: "hidden",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px" }}>
-                  <span style={{ width: 28, color: t.textSoft, fontSize: 11, fontFamily: FONTS.mono }}>
-                    {String(scene.id).padStart(2, "0")}
-                  </span>
-                  <Badge type={scene.type} />
-                  <span style={{ marginLeft: "auto", color: t.textSoft, fontSize: 10, fontFamily: FONTS.mono }}>
-                    {formatSceneTime(scene)}
-                  </span>
-                </div>
-                <div style={{ padding: "0 12px 12px 50px" }}>
-                  <textarea
-                    value={scene.description || ""}
-                    disabled={isApproved}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => patchScene(scene.id, { description: e.target.value })}
-                    placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
-                    rows={2}
-                    style={{
-                      width: "100%",
-                      resize: "vertical",
-                      minHeight: 48,
-                      borderRadius: 7,
-                      border: `1px solid ${t.border}`,
-                      background: t.bg,
-                      color: t.text,
-                      padding: "7px 9px",
-                      fontSize: 12,
-                      lineHeight: 1.45,
-                      outline: "none",
-                    }}
-                  />
-                </div>
-              </div>
+              <CardItem scene={scene} />
               {!typeFilter && <InsertDivider index={i + 1} />}
             </React.Fragment>
           );
@@ -1211,7 +1273,49 @@ const MappingScreen = ({
         theme={theme}
         accent={accent}
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6, marginRight: 8, borderRight: `1px solid ${t.border}`, paddingRight: 12 }}>
+              <button
+                onClick={() => setIsInfoOpen(!isInfoOpen)}
+                title={isInfoOpen ? "Hide Scene Details" : "Show Scene Details"}
+                style={{
+                  background: isInfoOpen ? a.light : "transparent",
+                  border: `1px solid ${isInfoOpen ? a.main : t.border}`,
+                  borderRadius: 8,
+                  width: 34,
+                  height: 34,
+                  cursor: "pointer",
+                  color: isInfoOpen ? a.text : t.textMid,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.15s ease",
+                  padding: 0,
+                }}
+              >
+                <Icon name="edit" size={14} color={isInfoOpen ? a.main : t.textMid} />
+              </button>
+              <button
+                onClick={() => setIsChatOpen(!isChatOpen)}
+                title={isChatOpen ? "Hide AI Assistant" : "Show AI Assistant"}
+                style={{
+                  background: isChatOpen ? a.light : "transparent",
+                  border: `1px solid ${isChatOpen ? a.main : t.border}`,
+                  borderRadius: 8,
+                  width: 34,
+                  height: 34,
+                  cursor: "pointer",
+                  color: isChatOpen ? a.text : t.textMid,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.15s ease",
+                  padding: 0,
+                }}
+              >
+                <Icon name="sparkle" size={14} color={isChatOpen ? a.main : t.textMid} />
+              </button>
+            </div>
             <Btn variant="secondary" icon="plus" theme={theme} accent={accent} onClick={() => addSceneAt("start")} disabled={isApproved}>
               Add start
             </Btn>
