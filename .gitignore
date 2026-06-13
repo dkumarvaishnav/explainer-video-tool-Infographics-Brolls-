@@ -26,3 +26,8 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Documentation & Specs
+Explainer-tool--changes.docx
+ENGINEERING SPEC — Infographic Automation.md
+infographic_automation_PRD_v1.2.md
