@@ -93,6 +93,8 @@ const Icon = ({ name, size = 16, color = "currentColor", style: extraStyle }) =>
     maximize:   <><rect x="4" y="4" width="16" height="16" rx="2"/></>,
     restore:    <><rect x="4" y="8" width="12" height="12" rx="2"/><path d="M9 8V5a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2h-3"/></>,
     chevronLeft: <><polyline points="15 18 9 12 15 6"/></>,
+    sun:        <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></>,
+    moon:       <><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></>,
   };
   return (
     <svg
@@ -167,6 +169,10 @@ const PhaseSidebar = ({
   onSessionSelect = null,
   onSessionDelete = null,
   onToggleCompact = null,
+  setTheme = null,
+  setAccent = null,
+  chatStyle = null,
+  setChatStyle = null,
   style = {},
 }) => {
   const t = THEMES[theme];
@@ -416,9 +422,123 @@ const PhaseSidebar = ({
       )}
 
       {/* Bottom */}
+      {compact && (
+        <div style={{
+          padding: "16px 0",
+          borderTop: `1px solid ${theme === "light" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)"}`,
+          display: "flex",
+          justifyContent: "center",
+          flexShrink: 0
+        }}>
+          <button
+            onClick={() => setTheme && setTheme(theme === "dark" ? "light" : "dark")}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: t.sidebarText,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 6,
+              borderRadius: 6,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+          >
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={16} color={t.sidebarText} />
+          </button>
+        </div>
+      )}
+
       {!compact && (
-        <div style={{ padding: "12px 18px", borderTop: `1px solid rgba(255,255,255,0.04)`, flexShrink: 0 }}>
-          <div style={{ fontSize: 10, color: t.sidebarText, letterSpacing: "0.03em" }}>v0.1.0 — localhost</div>
+        <div style={{
+          padding: "16px 18px",
+          borderTop: `1px solid ${theme === "light" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)"}`,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          flexShrink: 0
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {["teal", "violet", "amber"].map((ac) => (
+                <button
+                  key={ac}
+                  onClick={() => setAccent && setAccent(ac)}
+                  title={ac}
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    background: ACCENTS[ac].main,
+                    border: accent === ac ? "2px solid #fff" : "2px solid transparent",
+                    cursor: "pointer",
+                    padding: 0,
+                    boxShadow: accent === ac ? "0 0 0 1px rgba(0,0,0,0.3)" : "none",
+                  }}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={() => setTheme && setTheme(theme === "dark" ? "light" : "dark")}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: t.sidebarText,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                padding: "4px 8px",
+                borderRadius: 6,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} size={13} color={t.sidebarText} />
+              <span style={{ fontSize: 11, color: t.sidebarText }}>
+                {theme === "dark" ? "Light" : "Dark"}
+              </span>
+            </button>
+          </div>
+
+          {activePhase === "mapping" && setChatStyle && (
+            <button
+              onClick={() => setChatStyle(chatStyle === "card" ? "table" : "card")}
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.05)",
+                border: `1px solid ${theme === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)"}`,
+                color: "#fff",
+                borderRadius: 6,
+                padding: "6px 10px",
+                fontSize: 11,
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+            >
+              <Icon name={chatStyle === "card" ? "list" : "columns"} size={13} color="#fff" />
+              {chatStyle === "card" ? "Switch to Table View" : "Switch to Card View"}
+            </button>
+          )}
+
+          <div style={{ fontSize: 10, color: t.sidebarText, opacity: 0.5, letterSpacing: "0.03em" }}>
+            v0.1.0 — localhost
+          </div>
         </div>
       )}
     </div>

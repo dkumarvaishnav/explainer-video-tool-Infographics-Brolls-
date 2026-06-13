@@ -58,17 +58,14 @@ const MappingScreen = ({
   const [regenerating, setRegenerating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
-  const [leftColWidth, setLeftColWidth] = React.useState(62);
-  const [isResizingCols, setIsResizingCols] = React.useState(false);
-  const [detailsHeight, setDetailsHeight] = React.useState(350);
-  const [isResizingDetails, setIsResizingDetails] = React.useState(false);
+  const [panelOrder, setPanelOrder] = React.useState(["scenes", "info", "chat"]);
+  const [draggedPanelId, setDraggedPanelId] = React.useState(null);
+  const [draggedOverIndex, setDraggedOverIndex] = React.useState(null);
   const [reprocessingId, setReprocessingId] = React.useState(null);
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
-  const [infoPanelDock, setInfoPanelDock] = React.useState("right");
-  const [isDraggingPanel, setIsDraggingPanel] = React.useState(false);
-  const [dragPreviewSide, setDragPreviewSide] = React.useState(null);
   const [typeFilter, setTypeFilter] = React.useState(null);
   const chatEndRef = React.useRef(null);
+  const containerRef = React.useRef(null);
   const pad = density === "compact" ? 16 : 24;
   const isCardView = chatStyle === "card";
 
@@ -81,52 +78,7 @@ const MappingScreen = ({
     }
   };
 
-  const startResizingCols = (mouseDownEvent) => {
-    mouseDownEvent.preventDefault();
-    setIsResizingCols(true);
-    const startX = mouseDownEvent.clientX;
-    const startWidth = leftColWidth;
-    const containerWidth = mouseDownEvent.currentTarget.parentElement.clientWidth;
-
-    const doDrag = (mouseMoveEvent) => {
-      const deltaX = mouseMoveEvent.clientX - startX;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-      const newWidth = Math.max(30, Math.min(80, startWidth + deltaPercent));
-      setLeftColWidth(newWidth);
-    };
-
-    const stopDrag = () => {
-      setIsResizingCols(false);
-      window.removeEventListener('mousemove', doDrag);
-      window.removeEventListener('mouseup', stopDrag);
-    };
-
-    window.addEventListener('mousemove', doDrag);
-    window.addEventListener('mouseup', stopDrag);
-  };
-
-  const startResizingDetails = (mouseDownEvent) => {
-    mouseDownEvent.preventDefault();
-    setIsResizingDetails(true);
-    const startY = mouseDownEvent.clientY;
-    const startHeight = detailsHeight;
-
-    const doDrag = (mouseMoveEvent) => {
-      const newHeight = Math.max(150, Math.min(600, startHeight + (mouseMoveEvent.clientY - startY)));
-      setDetailsHeight(newHeight);
-    };
-
-    const stopDrag = () => {
-      setIsResizingDetails(false);
-      window.removeEventListener('mousemove', doDrag);
-      window.removeEventListener('mouseup', stopDrag);
-    };
-
-    window.addEventListener('mousemove', doDrag);
-    window.addEventListener('mouseup', stopDrag);
-  };
-
-  const startDraggingPanel = (mouseDownEvent) => {
+  const startDraggingPanelHeader = (mouseDownEvent, panelId) => {
     if (mouseDownEvent.button !== 0) return;
     if (
       mouseDownEvent.target.closest('button') ||
@@ -137,21 +89,47 @@ const MappingScreen = ({
       return;
     }
     mouseDownEvent.preventDefault();
-    setIsDraggingPanel(true);
-    setDragPreviewSide(infoPanelDock);
+    setDraggedPanelId(panelId);
+
+    const activePanels = panelOrder.filter(id => id !== "info" || isInfoOpen);
 
     const doDrag = (mouseMoveEvent) => {
-      const screenWidth = window.innerWidth;
-      const hoverSide = mouseMoveEvent.clientX < screenWidth / 2 ? "left" : "right";
-      setDragPreviewSide(hoverSide);
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const relativeX = mouseMoveEvent.clientX - rect.left;
+      const fraction = relativeX / rect.width;
+      const index = Math.max(0, Math.min(activePanels.length - 1, Math.floor(fraction * activePanels.length)));
+      setDraggedOverIndex(index);
     };
 
     const stopDrag = (mouseUpEvent) => {
-      setIsDraggingPanel(false);
-      const screenWidth = window.innerWidth;
-      const finalSide = mouseUpEvent.clientX < screenWidth / 2 ? "left" : "right";
-      setInfoPanelDock(finalSide);
-      setDragPreviewSide(null);
+      const container = containerRef.current;
+      let targetIndex = draggedOverIndex;
+      if (container && targetIndex === null) {
+        const rect = container.getBoundingClientRect();
+        const relativeX = mouseUpEvent.clientX - rect.left;
+        const fraction = relativeX / rect.width;
+        targetIndex = Math.max(0, Math.min(activePanels.length - 1, Math.floor(fraction * activePanels.length)));
+      }
+
+      if (targetIndex !== null) {
+        setPanelOrder(prevOrder => {
+          const activeOrder = prevOrder.filter(id => id !== "info" || isInfoOpen);
+          const targetPanelId = activeOrder[targetIndex];
+          const newOrder = [...prevOrder];
+          const dragIdx = newOrder.indexOf(panelId);
+          const targetIdx = newOrder.indexOf(targetPanelId);
+          if (dragIdx !== -1 && targetIdx !== -1) {
+            newOrder[dragIdx] = targetPanelId;
+            newOrder[targetIdx] = panelId;
+          }
+          return newOrder;
+        });
+      }
+
+      setDraggedPanelId(null);
+      setDraggedOverIndex(null);
       window.removeEventListener('mousemove', doDrag);
       window.removeEventListener('mouseup', stopDrag);
     };
@@ -551,40 +529,9 @@ const MappingScreen = ({
     const index = scenes.findIndex((scene) => scene.id === selectedScene.id);
 
     return (
-      <div style={{ padding: `${pad}px`, borderBottom: `1px solid ${t.border}`, background: t.bgSurface }}>
-        <div
-          onMouseDown={startDraggingPanel}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
-            cursor: isDraggingPanel ? "grabbing" : "grab",
-            userSelect: "none",
-            padding: "4px 8px",
-            background: isDraggingPanel ? (theme === "light" ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.03)") : "transparent",
-            borderRadius: 6,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 4, color: t.textSoft }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 2, opacity: 0.6 }}>
-              <circle cx="9" cy="5" r="1" />
-              <circle cx="9" cy="12" r="1" />
-              <circle cx="9" cy="19" r="1" />
-              <circle cx="15" cy="5" r="1" />
-              <circle cx="15" cy="12" r="1" />
-              <circle cx="15" cy="19" r="1" />
-            </svg>
-            <div style={{ fontSize: 11, fontFamily: FONTS.mono }}>
-              Scene {String(selectedScene.id).padStart(2, "0")}
-            </div>
-          </div>
+      <div style={{ padding: `${pad}px`, background: t.bgSurface }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <Badge type={selectedScene.type} />
-          {isDraggingPanel && (
-            <span style={{ fontSize: 10, color: a.main, fontWeight: 600, marginLeft: 8 }}>
-              Drag to other side to dock
-            </span>
-          )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
             <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("before"); }} disabled={isApproved}>
               Before
@@ -595,27 +542,6 @@ const MappingScreen = ({
             <Btn small variant="danger" icon="trash" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); deleteScene(selectedScene.id); }} disabled={isApproved || scenes.length <= 1}>
               Delete
             </Btn>
-            <div style={{ width: 1, height: 16, background: t.border, margin: "0 6px" }} />
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsInfoOpen(false); }}
-              title="Close details panel"
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: t.textSoft,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 4,
-                borderRadius: 4,
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = a.main}
-              onMouseLeave={(e) => e.currentTarget.style.color = t.textSoft}
-            >
-              <Icon name="x" size={14} color="currentColor" />
-            </button>
           </div>
         </div>
 
@@ -800,245 +726,316 @@ const MappingScreen = ({
         )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
-        <div style={{
-          flex: "0 0 " + leftColWidth + "%",
+      <div
+        ref={containerRef}
+        id="mapping-panels-container"
+        style={{
+          flex: 1,
           display: "flex",
-          flexDirection: "column",
           overflow: "hidden",
-          transition: isResizingCols ? "none" : "flex 0.2s ease"
-        }}>
-          {error && (
-            <div style={{ margin: `${pad}px ${pad}px 0`, padding: "10px 14px", borderRadius: 8, background: "oklch(94% 0.08 20)", border: "1px solid oklch(80% 0.1 20)", fontSize: 12, color: "oklch(35% 0.14 20)", display: "flex", gap: 8, alignItems: "center" }}>
-              <Icon name="alertTriangle" size={13} color="oklch(45% 0.16 20)" />
-              {error}
-            </div>
-          )}
-
-          {/* DOCKED LEFT EDITOR PANEL */}
-          {infoPanelDock === "left" && isInfoOpen && selectedScene && (
-            <>
-              <div style={{
-                flex: `0 0 ${detailsHeight}px`,
-                overflow: "auto",
-                borderBottom: `1px solid ${t.border}`,
-                background: t.bgSurface,
-                transition: isResizingDetails ? "none" : "flex 0.2s ease",
-              }}>
-                <EditorPanel />
-              </div>
+          position: "relative",
+          gap: 8,
+          padding: 8,
+          background: t.bg,
+        }}
+      >
+        {panelOrder.filter(id => id !== "info" || isInfoOpen).map((panelId) => {
+          if (panelId === "scenes") {
+            return (
               <div
-                onMouseDown={startResizingDetails}
+                key="scenes"
                 style={{
-                  height: "4px",
-                  background: isResizingDetails ? a.main : t.border,
-                  cursor: "row-resize",
-                  zIndex: 100,
-                  flexShrink: 0,
-                  transition: "background 0.15s ease",
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  background: t.bgSurface,
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 8,
+                  overflow: "hidden",
                 }}
-                onMouseEnter={(e) => e.target.style.background = a.main}
-                onMouseLeave={(e) => { if (!isResizingDetails) e.target.style.background = t.border; }}
-              />
-            </>
-          )}
-
-          <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
-            {scenes.length > 0 ? (
-              isCardView ? (
-                <CardView />
-              ) : (
-                <div style={{ borderRadius: 8, border: `1px solid ${t.border}`, overflow: "hidden", background: t.bgSurface }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "34px 124px 116px 1fr", gap: 10, padding: "8px 14px", background: t.bgSubtle, borderBottom: `1px solid ${t.border}` }}>
-                    {["#", "Type", "Time", "Editable scene description"].map((label) => (
-                      <div key={label} style={{ fontSize: 10, fontWeight: 700, color: t.textSoft, letterSpacing: "0.06em" }}>{label}</div>
-                    ))}
-                  </div>
-                  {!typeFilter && <InsertDivider index={0} />}
-                  {filteredScenes.map((scene, i) => (
-                    <React.Fragment key={scene.id}>
-                      <SceneRow scene={scene} />
-                      {!typeFilter && <InsertDivider index={i + 1} />}
-                    </React.Fragment>
-                  ))}
-                </div>
-              )
-            ) : regenerating ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
-                Generating scene plan with Gemini...
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
-                No scenes yet.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div
-          onMouseDown={startResizingCols}
-          style={{
-            width: "4px",
-            background: isResizingCols ? a.main : t.border,
-            cursor: "col-resize",
-            zIndex: 100,
-            flexShrink: 0,
-            transition: "background 0.15s ease",
-          }}
-          onMouseEnter={(e) => e.target.style.background = a.main}
-          onMouseLeave={(e) => { if (!isResizingCols) e.target.style.background = t.border; }}
-        />
-
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {/* DOCKED RIGHT EDITOR PANEL */}
-          {infoPanelDock === "right" && isInfoOpen && selectedScene && (
-            <>
-              <div style={{
-                flex: `0 0 ${detailsHeight}px`,
-                overflow: "auto",
-                borderBottom: `1px solid ${t.border}`,
-                background: t.bgSurface,
-                transition: isResizingDetails ? "none" : "flex 0.2s ease",
-              }}>
-                <EditorPanel />
-              </div>
-              <div
-                onMouseDown={startResizingDetails}
-                style={{
-                  height: "4px",
-                  background: isResizingDetails ? a.main : t.border,
-                  cursor: "row-resize",
-                  zIndex: 100,
-                  flexShrink: 0,
-                  transition: "background 0.15s ease",
-                }}
-                onMouseEnter={(e) => e.target.style.background = a.main}
-                onMouseLeave={(e) => { if (!isResizingDetails) e.target.style.background = t.border; }}
-              />
-            </>
-          )}
-
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {messages.map((msg, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                    {msg.role === "assistant" && (
-                      <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
-                        <Icon name="sparkle" size={12} color="#fff" />
-                      </div>
-                    )}
-                    <div style={{
-                      maxWidth: "82%",
-                      padding: "9px 12px",
-                      borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
-                      background: msg.role === "user" ? a.main : t.bgSurface,
-                      border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
-                      color: msg.role === "user" ? "#fff" : t.text,
-                      fontSize: 12,
-                      lineHeight: 1.6,
-                    }}>
-                      {msg.text}
-                    </div>
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
-                      <Icon name="sparkle" size={12} color="#fff" />
-                    </div>
-                    <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
-                      Thinking...
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            </div>
-
-            <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
-                  rows={2}
-                  disabled={chatLoading || regenerating || isApproved}
+              >
+                {/* Header */}
+                <div
+                  onMouseDown={(e) => startDraggingPanelHeader(e, "scenes")}
                   style={{
-                    flex: 1,
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    resize: "none",
-                    border: `1px solid ${t.border}`,
-                    background: t.bg,
-                    color: t.text,
-                    fontSize: 12,
-                    outline: "none",
-                    lineHeight: 1.5,
-                    opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
-                  }}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={chatLoading || !input.trim() || regenerating || isApproved}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
-                    border: "none",
-                    background: a.main,
-                    cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
+                    height: 40,
+                    padding: "0 12px",
+                    background: t.bgSubtle,
+                    borderBottom: `1px solid ${t.border}`,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
+                    cursor: draggedPanelId === "scenes" ? "grabbing" : "grab",
+                    userSelect: "none",
                   }}
                 >
-                  <Icon name="send" size={14} color="#fff" />
-                </button>
+                  <Icon name="map" size={14} color={a.main} style={{ marginRight: 8 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>Scene Plan</span>
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
+                  {error && (
+                    <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, background: "oklch(94% 0.08 20)", border: "1px solid oklch(80% 0.1 20)", fontSize: 12, color: "oklch(35% 0.14 20)", display: "flex", gap: 8, alignItems: "center" }}>
+                      <Icon name="alertTriangle" size={13} color="oklch(45% 0.16 20)" />
+                      {error}
+                    </div>
+                  )}
+
+                  {scenes.length > 0 ? (
+                    isCardView ? (
+                      <CardView />
+                    ) : (
+                      <div style={{ borderRadius: 8, border: `1px solid ${t.border}`, overflow: "hidden", background: t.bgSurface }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "34px 124px 116px 1fr", gap: 10, padding: "8px 14px", background: t.bgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                          {["#", "Type", "Time", "Editable scene description"].map((label) => (
+                            <div key={label} style={{ fontSize: 10, fontWeight: 700, color: t.textSoft, letterSpacing: "0.06em" }}>{label}</div>
+                          ))}
+                        </div>
+                        {!typeFilter && <InsertDivider index={0} />}
+                        {filteredScenes.map((scene, i) => (
+                          <React.Fragment key={scene.id}>
+                            <SceneRow scene={scene} />
+                            {!typeFilter && <InsertDivider index={i + 1} />}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    )
+                  ) : regenerating ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
+                      Generating scene plan with Gemini...
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 220, color: t.textSoft, fontSize: 13 }}>
+                      No scenes yet.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            );
+          }
+
+          if (panelId === "info") {
+            return (
+              <div
+                key="info"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  background: t.bgSurface,
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Header */}
+                <div
+                  onMouseDown={(e) => startDraggingPanelHeader(e, "info")}
+                  style={{
+                    height: 40,
+                    padding: "0 12px",
+                    background: t.bgSubtle,
+                    borderBottom: `1px solid ${t.border}`,
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: draggedPanelId === "info" ? "grabbing" : "grab",
+                    userSelect: "none",
+                  }}
+                >
+                  <Icon name="edit" size={14} color={a.main} style={{ marginRight: 8 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>Scene Details</span>
+                  <button
+                    onClick={() => setIsInfoOpen(false)}
+                    title="Close details"
+                    style={{
+                      marginLeft: "auto",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 4,
+                      borderRadius: 4,
+                      color: t.textSoft,
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = t.bgHover}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    <Icon name="x" size={14} color={t.textSoft} />
+                  </button>
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, overflow: "auto" }}>
+                  <EditorPanel />
+                </div>
+              </div>
+            );
+          }
+
+          if (panelId === "chat") {
+            return (
+              <div
+                key="chat"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  background: t.bgSurface,
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Header */}
+                <div
+                  onMouseDown={(e) => startDraggingPanelHeader(e, "chat")}
+                  style={{
+                    height: 40,
+                    padding: "0 12px",
+                    background: t.bgSubtle,
+                    borderBottom: `1px solid ${t.border}`,
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: draggedPanelId === "chat" ? "grabbing" : "grab",
+                    userSelect: "none",
+                  }}
+                >
+                  <Icon name="sparkle" size={14} color={a.main} style={{ marginRight: 8 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: t.text }}>AI Assistant</span>
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <div style={{ flex: 1, overflow: "auto", padding: `${pad}px` }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {messages.map((msg, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                          {msg.role === "assistant" && (
+                            <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, marginTop: 2 }}>
+                              <Icon name="sparkle" size={12} color="#fff" />
+                            </div>
+                          )}
+                          <div style={{
+                            maxWidth: "82%",
+                            padding: "9px 12px",
+                            borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
+                            background: msg.role === "user" ? a.main : t.bgSurface,
+                            border: msg.role === "assistant" ? `1px solid ${t.border}` : "none",
+                            color: msg.role === "user" ? "#fff" : t.text,
+                            fontSize: 12,
+                            lineHeight: 1.6,
+                          }}>
+                            {msg.text}
+                          </div>
+                        </div>
+                      ))}
+                      {chatLoading && (
+                        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                          <div style={{ width: 26, height: 26, borderRadius: 8, background: a.main, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8 }}>
+                            <Icon name="sparkle" size={12} color="#fff" />
+                          </div>
+                          <div style={{ padding: "9px 12px", borderRadius: "2px 12px 12px 12px", background: t.bgSurface, border: `1px solid ${t.border}`, color: t.textSoft, fontSize: 12 }}>
+                            Thinking...
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                  </div>
+
+                  <div style={{ padding: `12px ${pad}px`, borderTop: `1px solid ${t.border}`, background: t.bgSurface }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                      <textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                        placeholder='Ask AI to edit the plan, e.g. "split scene 4 into a b-roll intro and infographic payoff"'
+                        rows={2}
+                        disabled={chatLoading || regenerating || isApproved}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          resize: "none",
+                          border: `1px solid ${t.border}`,
+                          background: t.bg,
+                          color: t.text,
+                          fontSize: 12,
+                          outline: "none",
+                          lineHeight: 1.5,
+                          opacity: (chatLoading || regenerating || isApproved) ? 0.6 : 1,
+                        }}
+                      />
+                      <button
+                        onClick={sendMessage}
+                        disabled={chatLoading || !input.trim() || regenerating || isApproved}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          border: "none",
+                          background: a.main,
+                          cursor: (chatLoading || regenerating || isApproved) ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          opacity: (chatLoading || !input.trim() || regenerating || isApproved) ? 0.5 : 1,
+                        }}
+                      >
+                        <Icon name="send" size={14} color="#fff" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })}
 
         {/* DRAG AND DROP DOCK PREVIEW OVERLAY */}
-        {isDraggingPanel && dragPreviewSide && (
-          <div style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            left: dragPreviewSide === "left" ? 0 : "auto",
-            right: dragPreviewSide === "right" ? 0 : "auto",
-            width: dragPreviewSide === "left" ? `${leftColWidth}%` : `${100 - leftColWidth}%`,
-            background: `oklch(from ${a.main} l c h / 0.08)`,
-            border: `2px dashed ${a.main}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            pointerEvents: "none",
-            transition: "all 0.15s ease",
-          }}>
+        {draggedPanelId !== null && draggedOverIndex !== null && (() => {
+          const activePanels = panelOrder.filter(id => id !== "info" || isInfoOpen);
+          return (
             <div style={{
-              background: t.bgSurface,
-              border: `1px solid ${t.border}`,
-              padding: "12px 20px",
+              position: "absolute",
+              top: 8,
+              bottom: 8,
+              left: `calc(8px + ${draggedOverIndex} * (100% - 8px) / ${activePanels.length})`,
+              width: `calc((100% - 8px * (${activePanels.length} + 1)) / ${activePanels.length})`,
+              background: `oklch(from ${a.main} l c h / 0.08)`,
+              border: `2px dashed ${a.main}`,
               borderRadius: 8,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              color: a.main,
-              fontSize: 12,
-              fontWeight: 600,
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              justifyContent: "center",
+              zIndex: 1000,
+              pointerEvents: "none",
+              transition: "left 0.15s ease",
             }}>
-              <Icon name="sparkle" size={14} color={a.main} />
-              Dock Info Panel Here
+              <div style={{
+                background: t.bgSurface,
+                border: `1px solid ${t.border}`,
+                padding: "12px 20px",
+                borderRadius: 8,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                color: a.main,
+                fontSize: 12,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <Icon name="sparkle" size={14} color={a.main} />
+                Drop Panel Here
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

@@ -194,6 +194,10 @@ const AppShell = () => {
         onSessionSelect={handleLoadSession}
         onSessionDelete={handleDeleteSession}
         onToggleCompact={() => setSidebarCompact(!sidebarCompact)}
+        setTheme={setTheme}
+        setAccent={setAccent}
+        chatStyle={chatStyle}
+        setChatStyle={setChatStyle}
         style={{ width: sidebarCompact ? 56 : sidebarWidth, transition: isResizingSidebar ? "none" : "width 0.2s ease" }}
       />
 
@@ -214,88 +218,6 @@ const AppShell = () => {
       )}
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{
-          height: 32,
-          background: t.bgSurface,
-          borderBottom: `1px solid ${t.border}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          padding: "0 16px",
-          gap: 12,
-          flexShrink: 0,
-        }}>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: t.textSoft,
-              fontSize: 11,
-              padding: "2px 6px",
-              borderRadius: 4,
-            }}
-          >
-            {theme === "dark" ? "Light" : "Dark"}
-          </button>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {["teal", "violet", "amber"].map((ac) => (
-              <button
-                key={ac}
-                onClick={() => setAccent(ac)}
-                title={ac}
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: "50%",
-                  background: ACCENTS[ac].main,
-                  border: accent === ac ? `2px solid ${t.text}` : "2px solid transparent",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-
-          {phase === "mapping" && (
-            <button
-              onClick={() => setChatStyle(chatStyle === "card" ? "table" : "card")}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: t.textSoft,
-                fontSize: 11,
-                padding: "2px 6px",
-                borderRadius: 4,
-              }}
-            >
-              {chatStyle === "card" ? "Table view" : "Card view"}
-            </button>
-          )}
-
-          <button
-            onClick={() => setSidebarCompact(!sidebarCompact)}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: t.textSoft,
-              fontSize: 11,
-              padding: "2px 6px",
-              borderRadius: 4,
-            }}
-          >
-            {sidebarCompact ? "Expand sidebar" : "Collapse sidebar"}
-          </button>
-        </div>
-
         {screens[phase] || screens.upload}
       </div>
     </div>
