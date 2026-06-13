@@ -33,6 +33,206 @@ const formatSceneTime = (scene) => {
   return `${start} -> ${end}${scene.estimated ? " est." : ""}`;
 };
 
+const EditorPanel = ({
+  theme,
+  accent,
+  pad,
+  selectedScene,
+  isApproved,
+  reprocessingId,
+  saving,
+  scenes,
+  moveScene,
+  addSceneAt,
+  deleteScene,
+  onSaveScene,
+  onSaveAndReprocess,
+}) => {
+  const t = THEMES[theme];
+  const a = ACCENTS[accent];
+
+  const [type, setType] = React.useState(selectedScene.type);
+  const [ratio, setRatio] = React.useState(selectedScene.aspect_ratio || "16:9");
+  const [startTime, setStartTime] = React.useState(selectedScene.start_time || "");
+  const [endTime, setEndTime] = React.useState(selectedScene.end_time || "");
+  const [estimated, setEstimated] = React.useState(!!selectedScene.estimated);
+  const [description, setDescription] = React.useState(selectedScene.description || "");
+  const [sourceText, setSourceText] = React.useState(selectedScene.source_text || "");
+
+  React.useEffect(() => {
+    setType(selectedScene.type);
+    setRatio(selectedScene.aspect_ratio || "16:9");
+    setStartTime(selectedScene.start_time || "");
+    setEndTime(selectedScene.end_time || "");
+    setEstimated(!!selectedScene.estimated);
+    setDescription(selectedScene.description || "");
+    setSourceText(selectedScene.source_text || "");
+  }, [
+    selectedScene.id,
+    selectedScene.type,
+    selectedScene.aspect_ratio,
+    selectedScene.start_time,
+    selectedScene.end_time,
+    selectedScene.estimated,
+    selectedScene.description,
+    selectedScene.source_text,
+  ]);
+
+  const index = scenes.findIndex((scene) => scene.id === selectedScene.id);
+
+  const typeChanged = type !== selectedScene.type;
+  const ratioChanged = ratio !== (selectedScene.aspect_ratio || "16:9");
+  const isReprocess = typeChanged || ratioChanged;
+
+  const handleButtonClick = () => {
+    const updatedFields = {
+      type,
+      aspect_ratio: ratio,
+      start_time: startTime || null,
+      end_time: endTime || null,
+      estimated,
+      description,
+      source_text: sourceText,
+    };
+
+    if (isReprocess) {
+      onSaveAndReprocess(selectedScene.id, updatedFields);
+    } else {
+      onSaveScene(selectedScene.id, updatedFields);
+    }
+  };
+
+  const isBtnDisabled = isApproved || reprocessingId === selectedScene.id || saving;
+
+  let btnLabel = isReprocess ? "Re-process" : "Save";
+  if (saving) btnLabel = "Saving...";
+  if (reprocessingId === selectedScene.id) btnLabel = "Rewriting...";
+
+  return (
+    <div style={{ padding: `${pad}px`, background: t.bgSurface }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Badge type={selectedScene.type} />
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+          <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("before"); }} disabled={isApproved}>
+            Before
+          </Btn>
+          <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("after"); }} disabled={isApproved}>
+            After
+          </Btn>
+          <Btn small variant="danger" icon="trash" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); deleteScene(selectedScene.id); }} disabled={isApproved || scenes.length <= 1}>
+            Delete
+          </Btn>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
+          TYPE
+          <select
+            value={type}
+            disabled={isApproved || reprocessingId !== null}
+            onChange={(e) => setType(e.target.value)}
+            style={{ width: "100%", padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
+          >
+            {ASSET_TYPES.map((tVal) => <option key={tVal} value={tVal}>{tVal}</option>)}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
+          RATIO
+          <select
+            value={ratio}
+            disabled={isApproved}
+            onChange={(e) => setRatio(e.target.value)}
+            style={{ padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
+          >
+            <option value="16:9">16:9</option>
+            <option value="1:1">1:1</option>
+            <option value="9:16">9:16</option>
+          </select>
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
+          START
+          <input
+            value={startTime}
+            disabled={isApproved}
+            onChange={(e) => setStartTime(e.target.value)}
+            placeholder="00:00:12,000"
+            style={{ padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
+          />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
+          END
+          <input
+            value={endTime}
+            disabled={isApproved}
+            onChange={(e) => setEndTime(e.target.value)}
+            placeholder="00:00:12,000"
+            style={{ padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
+          />
+        </label>
+      </div>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, color: t.textSoft, fontSize: 11 }}>
+        <input
+          type="checkbox"
+          checked={estimated}
+          disabled={isApproved}
+          onChange={(e) => setEstimated(e.target.checked)}
+        />
+        Estimated timestamp
+      </label>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 10 }}>
+        DESCRIPTION
+        <textarea
+          value={description}
+          disabled={isApproved}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={4}
+          style={{ width: "100%", resize: "vertical", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, padding: "8px 10px", fontSize: 12, lineHeight: 1.55, outline: "none" }}
+        />
+      </label>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 10 }}>
+        SOURCE LINE
+        <textarea
+          value={sourceText}
+          disabled={isApproved}
+          onChange={(e) => setSourceText(e.target.value)}
+          rows={3}
+          style={{ width: "100%", resize: "vertical", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, padding: "8px 10px", fontSize: 12, lineHeight: 1.55, outline: "none", fontFamily: FONTS.mono }}
+        />
+      </label>
+
+      <div style={{ marginBottom: 14 }}>
+        <Btn
+          variant="primary"
+          icon={isReprocess ? "sparkle" : "check"}
+          theme={theme}
+          accent={accent}
+          disabled={isBtnDisabled}
+          onClick={handleButtonClick}
+          style={{ width: "100%", justifyContent: "center", height: 38 }}
+        >
+          {btnLabel}
+        </Btn>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+        <Btn small variant="secondary" theme={theme} accent={accent} onClick={() => moveScene(selectedScene.id, -1)} disabled={isApproved || index <= 0}>
+          Move up
+        </Btn>
+        <Btn small variant="secondary" theme={theme} accent={accent} onClick={() => moveScene(selectedScene.id, 1)} disabled={isApproved || index >= scenes.length - 1}>
+          Move down
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
 const MappingScreen = ({
   theme,
   accent,
@@ -45,6 +245,7 @@ const MappingScreen = ({
   onScenesUpdated,
   onMessagesUpdated,
   onNext,
+  onLoadSession,
 }) => {
   const t = THEMES[theme];
   const a = ACCENTS[accent];
@@ -57,6 +258,7 @@ const MappingScreen = ({
   const [approving, setApproving] = React.useState(false);
   const [regenerating, setRegenerating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [duplicating, setDuplicating] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [panelOrder, setPanelOrder] = React.useState(["scenes", "info", "chat"]);
   const [draggedPanelId, setDraggedPanelId] = React.useState(null);
@@ -475,7 +677,27 @@ const MappingScreen = ({
       </div>
       {/* Content */}
       <div style={{ flex: 1, overflow: "auto" }}>
-        <EditorPanel />
+        {selectedScene ? (
+          <EditorPanel
+            theme={theme}
+            accent={accent}
+            pad={pad}
+            selectedScene={selectedScene}
+            isApproved={isApproved}
+            reprocessingId={reprocessingId}
+            saving={saving}
+            scenes={scenes}
+            moveScene={moveScene}
+            addSceneAt={addSceneAt}
+            deleteScene={deleteScene}
+            onSaveScene={handleSaveScene}
+            onSaveAndReprocess={handleSaveAndReprocess}
+          />
+        ) : (
+          <div style={{ padding: 16, color: t.textSoft, fontSize: 12 }}>
+            Select a scene to edit it.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -768,6 +990,61 @@ const MappingScreen = ({
     }
   };
 
+  const handleSaveScene = async (id, updatedFields) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const nextScenes = scenes.map((scene) =>
+        scene.id === id ? { ...scene, ...updatedFields, prompt: null } : scene
+      );
+      const res = await fetch("/update-scenes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, scenes: renumberLocal(nextScenes) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Save failed" }));
+        const detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+        throw new Error(detail || "Save failed");
+      }
+      const data = await res.json();
+      updateScenes(data.scenes, id);
+    } catch (e) {
+      setError(e.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAndReprocess = async (id, updatedFields) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const nextScenes = scenes.map((scene) =>
+        scene.id === id ? { ...scene, ...updatedFields, prompt: null } : scene
+      );
+      const res = await fetch("/update-scenes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, scenes: renumberLocal(nextScenes) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Save failed" }));
+        const detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+        throw new Error(detail || "Save failed");
+      }
+      const data = await res.json();
+      updateScenes(data.scenes, id);
+
+      const targetType = updatedFields.type || "INFOGRAPHIC";
+      setSaving(false);
+      await handleReprocessScene(id, targetType);
+    } catch (e) {
+      setError(e.message || "Save & Reprocess failed");
+      setSaving(false);
+    }
+  };
+
   React.useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -930,6 +1207,29 @@ const MappingScreen = ({
     }
   };
 
+  const handleDuplicate = async () => {
+    if (duplicating) return;
+    setDuplicating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/sessions/${sessionId}/duplicate`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Duplication failed" }));
+        throw new Error(err.detail || "Duplication failed");
+      }
+      const data = await res.json();
+      if (onLoadSession) {
+        await onLoadSession(data.session.session_id);
+      }
+    } catch (e) {
+      setError(e.message || "Duplication failed");
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   const typeCount = scenes.reduce((acc, scene) => {
     acc[scene.type] = (acc[scene.type] || 0) + 1;
     return acc;
@@ -987,9 +1287,7 @@ const MappingScreen = ({
         )}
         <textarea
           value={scene.description || ""}
-          disabled={isApproved}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => patchScene(scene.id, { description: e.target.value })}
+          readOnly={true}
           placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
           rows={compact ? 1 : 2}
           style={{
@@ -1004,6 +1302,7 @@ const MappingScreen = ({
             fontSize: 12,
             lineHeight: 1.45,
             outline: "none",
+            pointerEvents: "none",
           }}
         />
       </div>
@@ -1097,9 +1396,7 @@ const MappingScreen = ({
         <div style={{ padding: "0 12px 12px 50px" }}>
           <textarea
             value={scene.description || ""}
-            disabled={isApproved}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => patchScene(scene.id, { description: e.target.value })}
+            readOnly={true}
             placeholder={scene.type === "BROLL" ? "Describe the b-roll shot..." : "Describe the infographic..."}
             rows={2}
             style={{
@@ -1114,6 +1411,7 @@ const MappingScreen = ({
               fontSize: 12,
               lineHeight: 1.45,
               outline: "none",
+              pointerEvents: "none",
             }}
           />
         </div>
@@ -1138,132 +1436,7 @@ const MappingScreen = ({
     );
   };
 
-  const EditorPanel = () => {
-    if (!selectedScene) {
-      return (
-        <div style={{ padding: 16, color: t.textSoft, fontSize: 12 }}>
-          Select a scene to edit it.
-        </div>
-      );
-    }
 
-    const index = scenes.findIndex((scene) => scene.id === selectedScene.id);
-
-    return (
-      <div style={{ padding: `${pad}px`, background: t.bgSurface }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <Badge type={selectedScene.type} />
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-            <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("before"); }} disabled={isApproved}>
-              Before
-            </Btn>
-            <Btn small variant="secondary" icon="plus" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); addSceneAt("after"); }} disabled={isApproved}>
-              After
-            </Btn>
-            <Btn small variant="danger" icon="trash" theme={theme} accent={accent} onClick={(e) => { e.stopPropagation(); deleteScene(selectedScene.id); }} disabled={isApproved || scenes.length <= 1}>
-              Delete
-            </Btn>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
-            TYPE
-            <div style={{ display: "flex", gap: 6 }}>
-              <select
-                value={selectedScene.type}
-                disabled={isApproved || reprocessingId !== null}
-                onChange={(e) => patchScene(selectedScene.id, { type: e.target.value })}
-                style={{ flex: 1, padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
-              >
-                {ASSET_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-              </select>
-              <Btn
-                small
-                variant="secondary"
-                icon={reprocessingId === selectedScene.id ? "refresh" : "sparkle"}
-                theme={theme}
-                accent={accent}
-                disabled={isApproved || reprocessingId !== null}
-                onClick={() => handleReprocessScene(selectedScene.id, selectedScene.type)}
-              >
-                {reprocessingId === selectedScene.id ? "Rewriting..." : "Re-process"}
-              </Btn>
-            </div>
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
-            RATIO
-            <select
-              value={selectedScene.aspect_ratio || "16:9"}
-              disabled={isApproved}
-              onChange={(e) => patchScene(selectedScene.id, { aspect_ratio: e.target.value })}
-              style={{ padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
-            >
-              <option value="16:9">16:9</option>
-              <option value="1:1">1:1</option>
-              <option value="9:16">9:16</option>
-            </select>
-          </label>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          {["start_time", "end_time"].map((key) => (
-            <label key={key} style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
-              {key === "start_time" ? "START" : "END"}
-              <input
-                value={selectedScene[key] || ""}
-                disabled={isApproved}
-                onChange={(e) => patchScene(selectedScene.id, { [key]: e.target.value || null })}
-                placeholder="00:00:12,000"
-                style={{ padding: "8px 9px", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, fontSize: 12, fontFamily: FONTS.mono }}
-              />
-            </label>
-          ))}
-        </div>
-
-        <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, color: t.textSoft, fontSize: 11 }}>
-          <input
-            type="checkbox"
-            checked={!!selectedScene.estimated}
-            disabled={isApproved}
-            onChange={(e) => patchScene(selectedScene.id, { estimated: e.target.checked })}
-          />
-          Estimated timestamp
-        </label>
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em", marginBottom: 10 }}>
-          DESCRIPTION
-          <textarea
-            value={selectedScene.description || ""}
-            disabled={isApproved}
-            onChange={(e) => patchScene(selectedScene.id, { description: e.target.value })}
-            rows={4}
-            style={{ width: "100%", resize: "vertical", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, padding: "8px 10px", fontSize: 12, lineHeight: 1.55, outline: "none" }}
-          />
-        </label>
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 10, color: t.textSoft, fontWeight: 700, letterSpacing: "0.04em" }}>
-          SOURCE LINE
-          <textarea
-            value={selectedScene.source_text || ""}
-            disabled={isApproved}
-            onChange={(e) => patchScene(selectedScene.id, { source_text: e.target.value })}
-            rows={3}
-            style={{ width: "100%", resize: "vertical", borderRadius: 7, border: `1px solid ${t.border}`, background: t.bg, color: t.text, padding: "8px 10px", fontSize: 12, lineHeight: 1.55, outline: "none", fontFamily: FONTS.mono }}
-          />
-        </label>
-
-        <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-          <Btn small variant="secondary" theme={theme} accent={accent} onClick={() => moveScene(selectedScene.id, -1)} disabled={isApproved || index <= 0}>
-            Move up
-          </Btn>
-          <Btn small variant="secondary" theme={theme} accent={accent} onClick={() => moveScene(selectedScene.id, 1)} disabled={isApproved || index >= scenes.length - 1}>
-            Move down
-          </Btn>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: t.bg, overflow: "hidden" }}>
@@ -1325,9 +1498,15 @@ const MappingScreen = ({
             <Btn variant="secondary" icon="refresh" theme={theme} accent={accent} onClick={fetchMapping} disabled={regenerating || isApproved}>
               {regenerating ? "Generating..." : "Regenerate draft"}
             </Btn>
-            <Btn variant="primary" icon="lock" theme={theme} accent={accent} onClick={handleApprove} disabled={approving || saving || scenes.length === 0 || regenerating}>
-              {approving || saving ? "Saving..." : "Approve Plan"}
-            </Btn>
+            {isApproved ? (
+              <Btn variant="primary" icon="copy" theme={theme} accent={accent} onClick={handleDuplicate} disabled={duplicating}>
+                {duplicating ? "Duplicating..." : "Duplicate project and edit"}
+              </Btn>
+            ) : (
+              <Btn variant="primary" icon="lock" theme={theme} accent={accent} onClick={handleApprove} disabled={approving || saving || scenes.length === 0 || regenerating}>
+                {approving || saving ? "Saving..." : "Approve Plan"}
+              </Btn>
+            )}
           </div>
         }
       />

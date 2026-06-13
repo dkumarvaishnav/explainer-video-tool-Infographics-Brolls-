@@ -12,61 +12,112 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
   const [exportOpen, setExportOpen] = React.useState(false);
   const [exportFormat, setExportFormat] = React.useState("stacked");
   const [exportFileName, setExportFileName] = React.useState("");
+  const [exportExtension, setExportExtension] = React.useState("txt");
   const pad = density === "compact" ? 16 : 24;
 
-  const handleExport = (fileName, format) => {
-    let text = `=========================================\n`;
-    text += `PROJECT: ${projectName || "Untitled"}\n`;
-    text += `PROMPTS MANIFEST (${format === "stacked" ? "SCENE SEQUENCE" : "SEPARATED BY TYPE"})\n`;
-    text += `=========================================\n\n`;
+  const handleExport = (fileName, format, ext = "txt") => {
+    let text = "";
 
-    if (format === "stacked") {
-      scenes.forEach((scene, i) => {
-        text += `Scene ${String(scene.id).padStart(2, "0")} - ${scene.type}\n`;
-        text += `Brief: ${scene.description || "Untitled"}\n`;
-        text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
-        text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
-        if (i < scenes.length - 1) {
-          text += `-----------------------------------------\n\n`;
-        }
-      });
+    if (ext === "md") {
+      text += `# Project: ${projectName || "Untitled"}\n\n`;
+      text += `**Prompts Manifest (${format === "stacked" ? "Scene Sequence" : "Separated by Type"})**\n\n`;
+      text += `---\n\n`;
+
+      if (format === "stacked") {
+        scenes.forEach((scene, i) => {
+          text += `## Scene ${String(scene.id).padStart(2, "0")} - ${scene.type}\n`;
+          text += `- **Brief:** ${scene.description || "Untitled"}\n`;
+          text += `- **Duration:** ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n\n`;
+          text += `### Prompt\n`;
+          text += `\`\`\`text\n${scene.prompt || "No prompt generated."}\n\`\`\`\n\n`;
+          if (i < scenes.length - 1) {
+            text += `---\n\n`;
+          }
+        });
+      } else {
+        const infographics = scenes.filter(s => s.type === "INFOGRAPHIC");
+        const broll = scenes.filter(s => s.type === "BROLL");
+
+        text += `## Infographics (total: ${infographics.length})\n\n`;
+        infographics.forEach((scene, i) => {
+          text += `### Scene ${String(scene.id).padStart(2, "0")} - INFOGRAPHIC\n`;
+          text += `- **Brief:** ${scene.description || "Untitled"}\n`;
+          text += `- **Duration:** ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n\n`;
+          text += `#### Prompt\n`;
+          text += `\`\`\`text\n${scene.prompt || "No prompt generated."}\n\`\`\`\n\n`;
+          if (i < infographics.length - 1) {
+            text += `---\n\n`;
+          }
+        });
+
+        text += `\n---\n\n`;
+        text += `## Video B-roll (total: ${broll.length})\n\n`;
+        broll.forEach((scene, i) => {
+          text += `### Scene ${String(scene.id).padStart(2, "0")} - BROLL\n`;
+          text += `- **Brief:** ${scene.description || "Untitled"}\n`;
+          text += `- **Duration:** ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n\n`;
+          text += `#### Prompt\n`;
+          text += `\`\`\`text\n${scene.prompt || "No prompt generated."}\n\`\`\`\n\n`;
+          if (i < broll.length - 1) {
+            text += `---\n\n`;
+          }
+        });
+      }
     } else {
-      const infographics = scenes.filter(s => s.type === "INFOGRAPHIC");
-      const broll = scenes.filter(s => s.type === "BROLL");
+      text += `=========================================\n`;
+      text += `PROJECT: ${projectName || "Untitled"}\n`;
+      text += `PROMPTS MANIFEST (${format === "stacked" ? "SCENE SEQUENCE" : "SEPARATED BY TYPE"})\n`;
+      text += `=========================================\n\n`;
 
-      text += `-----------------------------------------\n`;
-      text += `INFOGRAPHICS (total: ${infographics.length})\n`;
-      text += `-----------------------------------------\n\n`;
-      infographics.forEach((scene, i) => {
-        text += `Scene ${String(scene.id).padStart(2, "0")} - INFOGRAPHIC\n`;
-        text += `Brief: ${scene.description || "Untitled"}\n`;
-        text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
-        text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
-        if (i < infographics.length - 1) {
-          text += `-----------------------------------------\n\n`;
-        }
-      });
+      if (format === "stacked") {
+        scenes.forEach((scene, i) => {
+          text += `Scene ${String(scene.id).padStart(2, "0")} - ${scene.type}\n`;
+          text += `Brief: ${scene.description || "Untitled"}\n`;
+          text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
+          text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
+          if (i < scenes.length - 1) {
+            text += `-----------------------------------------\n\n`;
+          }
+        });
+      } else {
+        const infographics = scenes.filter(s => s.type === "INFOGRAPHIC");
+        const broll = scenes.filter(s => s.type === "BROLL");
 
-      text += `\n`;
-      text += `-----------------------------------------\n`;
-      text += `VIDEO B-ROLL (total: ${broll.length})\n`;
-      text += `-----------------------------------------\n\n`;
-      broll.forEach((scene, i) => {
-        text += `Scene ${String(scene.id).padStart(2, "0")} - BROLL\n`;
-        text += `Brief: ${scene.description || "Untitled"}\n`;
-        text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
-        text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
-        if (i < broll.length - 1) {
-          text += `-----------------------------------------\n\n`;
-        }
-      });
+        text += `-----------------------------------------\n`;
+        text += `INFOGRAPHICS (total: ${infographics.length})\n`;
+        text += `-----------------------------------------\n\n`;
+        infographics.forEach((scene, i) => {
+          text += `Scene ${String(scene.id).padStart(2, "0")} - INFOGRAPHIC\n`;
+          text += `Brief: ${scene.description || "Untitled"}\n`;
+          text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
+          text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
+          if (i < infographics.length - 1) {
+            text += `-----------------------------------------\n\n`;
+          }
+        });
+
+        text += `\n`;
+        text += `-----------------------------------------\n`;
+        text += `VIDEO B-ROLL (total: ${broll.length})\n`;
+        text += `-----------------------------------------\n\n`;
+        broll.forEach((scene, i) => {
+          text += `Scene ${String(scene.id).padStart(2, "0")} - BROLL\n`;
+          text += `Brief: ${scene.description || "Untitled"}\n`;
+          text += `Duration: ${scene.start_time ? scene.start_time.substring(0, 8) : "--:--:--"} -> ${scene.end_time ? scene.end_time.substring(0, 8) : "--:--:--"}\n`;
+          text += `Prompt:\n${scene.prompt || "No prompt generated."}\n`;
+          if (i < broll.length - 1) {
+            text += `-----------------------------------------\n\n`;
+          }
+        });
+      }
     }
 
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const mimeType = ext === "md" ? "text/markdown;charset=utf-8" : "text/plain;charset=utf-8";
+    const blob = new Blob([text], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${fileName || projectName || "project"}.txt`;
+    link.download = `${fileName || projectName || "project"}.${ext}`;
     link.click();
     URL.revokeObjectURL(url);
     setExportOpen(false);
@@ -75,6 +126,7 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
   const openExportModal = () => {
     setExportFileName(projectName || "project");
     setExportFormat("stacked");
+    setExportExtension("txt");
     setExportOpen(true);
   };
 
@@ -186,7 +238,7 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
         </div>
         <textarea
           value={scene.prompt || ""}
-          onChange={(e) => setPrompt(scene.id, e.target.value)}
+          readOnly={true}
           rows={5}
           placeholder={loading ? "Generating prompt..." : "Prompt will appear here."}
           style={{
@@ -369,7 +421,36 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
                     paddingRight: 45,
                   }}
                 />
-                <span style={{ position: "absolute", right: 12, fontSize: 12, color: t.textSoft, fontFamily: FONTS.mono }}>.txt</span>
+                <span style={{ position: "absolute", right: 12, fontSize: 12, color: t.textSoft, fontFamily: FONTS.mono }}>.{exportExtension}</span>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textSoft, marginBottom: 8, letterSpacing: "0.04em" }}>FILE FORMAT</label>
+              <div style={{ display: "flex", gap: 12 }}>
+                {[
+                  { id: "txt", label: "Text (.txt)" },
+                  { id: "md", label: "Markdown (.md)" }
+                ].map(opt => (
+                  <label
+                    key={opt.id}
+                    style={{
+                      flex: 1, display: "flex", alignItems: "center", gap: 8,
+                      padding: "8px 12px", borderRadius: 8, border: `1px solid ${exportExtension === opt.id ? a.main : t.border}`,
+                      background: exportExtension === opt.id ? a.light : t.bg,
+                      cursor: "pointer", boxSizing: "border-box",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="exportExtension"
+                      checked={exportExtension === opt.id}
+                      onChange={() => setExportExtension(opt.id)}
+                      style={{ accentColor: a.main }}
+                    />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: exportExtension === opt.id ? a.text : t.text }}>{opt.label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -407,7 +488,7 @@ const PromptScreen = ({ theme, accent, density, sessionId, projectName, initialS
 
             <div style={{ display: "flex", gap: 10, marginTop: 10, justifyContent: "flex-end" }}>
               <Btn variant="secondary" onClick={() => setExportOpen(false)} theme={theme} accent={accent}>Cancel</Btn>
-              <Btn variant="primary" onClick={() => handleExport(exportFileName, exportFormat)} theme={theme} accent={accent}>Export</Btn>
+              <Btn variant="primary" onClick={() => handleExport(exportFileName, exportFormat, exportExtension)} theme={theme} accent={accent}>Export</Btn>
             </div>
           </div>
         </div>

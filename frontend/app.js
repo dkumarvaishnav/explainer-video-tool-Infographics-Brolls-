@@ -46,7 +46,7 @@ const AppShell = () => {
 
   const fetchSessions = async () => {
     try {
-      const res = await fetch("/sessions");
+      const res = await fetch("/sessions?_t=" + Date.now());
       if (res.ok) {
         const data = await res.json();
         setSessions(data.sessions || []);
@@ -97,6 +97,7 @@ const AppShell = () => {
       } else {
         setPhase("upload");
       }
+      await fetchSessions();
     } catch (err) {
       alert("Error loading session: " + err.message);
     }
@@ -156,6 +157,7 @@ const AppShell = () => {
     ),
     mapping: (
       <MappingScreen
+        key={sessionId}
         theme={theme}
         accent={accent}
         density={density}
@@ -167,10 +169,12 @@ const AppShell = () => {
         onScenesUpdated={setMappingScenes}
         onMessagesUpdated={setMappingMessages}
         onNext={handleMappingNext}
+        onLoadSession={handleLoadSession}
       />
     ),
     prompts: (
       <PromptScreen
+        key={sessionId}
         theme={theme}
         accent={accent}
         density={density}

@@ -526,6 +526,51 @@ async def approve_mapping(body: ApproveMappingRequest):
     return SessionResponse(session_id=body.session_id, status="approved")
 
 
+@app.post("/sessions/{session_id}/duplicate", response_model=SessionDetailResponse, tags=["Phase 3 - Mapping"])
+async def duplicate_session(session_id: str):
+    """
+    Duplicate a locked project and return the editable copy.
+    """
+    import uuid
+    from backend.schemas import Session
+
+    original = store.get(session_id)
+    if original is None:
+        original = await store.load(session_id)
+        if original is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+    new_id = uuid.uuid4().hex
+    new_project_name = f"{original.project_name or 'Untitled'} (Copy)"
+
+    cloned_scenes = []
+    for s in original.scenes:
+        cloned_s = s.model_copy()
+        cloned_s.prompt = None
+        cloned_s.cached_prompt = None
+        cloned_s.status = "pending"
+        cloned_scenes.append(cloned_s)
+
+    cloned_session = Session(
+        session_id=new_id,
+        mode=original.mode,
+        raw_input=original.raw_input,
+        project_name=new_project_name,
+        duration_estimate=original.duration_estimate,
+        scene_count_hint=original.scene_count_hint,
+        scenes=cloned_scenes,
+        chat_history=original.chat_history.copy(),
+        approved=False,
+        style=original.style.model_copy() if original.style else None,
+        total_scenes=len(cloned_scenes),
+    )
+
+    store.create(cloned_session)
+    await store.persist(cloned_session)
+    
+    return SessionDetailResponse(session=cloned_session)
+
+
 @app.post("/generate-prompts", response_model=PromptResponse, tags=["Phase 4 - Prompts"])
 async def generate_prompts(body: GeneratePromptsRequest):
     """
